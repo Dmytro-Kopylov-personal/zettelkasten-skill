@@ -2,6 +2,72 @@
 
 Measurements, appended as phases complete. A phase's gate is met here or it is not met.
 
+## P4 — Install and init (2026-09-26)
+
+**The loop closes: the skill's own linter, run over the vault the skill scaffolds, reports
+zero findings and exits 0.** Five templates ship in `skill/templates/`, the Init section of
+the body materialises them, and `tests/test_self_consistency.py` performs that section
+literally — creates the six directories, copies the five files, fills the domain, appends the
+init log entry — then lints the result with the real `lint_vault`. A scaffold the linter
+rejects would be the worst possible first impression: a user handed a fresh vault and
+immediately told to fix it.
+
+The loop has three sides and all three are asserted, because any two can agree while the
+third drifts: the body names five templates, `skill/templates/` holds exactly those five,
+and a vault built from them lints clean. No dangling link in either direction.
+
+**The oracle found a real defect in the shipped body on its first run.** Init step 3 read
+"materialise `SCHEMA.md` from `templates/SCHEMA.md`, `structure/index.md` from
+`templates/index.md`, `structure/concept-table.md`, `structure/overview.md`, and `log.md`
+from `templates/log.md`" — naming five destinations and two sources, leaving an agent to
+guess where the other two came from. The step now gives a source for every destination.
+Three goldens re-rendered, diff reviewed, byte-identical across platforms as the shared-body
+invariant requires.
+
+**Two scaffold traps are pinned separately**, because a fresh vault has nothing to lint and
+would go green whether or not they work. The index template shows its entry format *inside a
+fence*; if the wikilink extractor ever stopped stripping fences, every vault would be born
+with a dangling link. The log template shows its entry format in a fence too, and `ZK022`
+reads every bullet line whether fenced or not — so the example carries a real date, and a
+test asserts it keeps one.
+
+**The installer, through a fake home.** `install.sh` renders, validates, then copies; every
+test passes `--target-root`, and the real `$HOME` is never read or written. The five
+idempotency cases are exercised end to end:
+
+| Case | Result |
+|---|---|
+| files identical | no write, no backup, tree hash unchanged |
+| managed, differs | `.bak.<utc>` written first, then the render; the backup holds the hand edit |
+| present but unmanaged | **refused, exit 4**, nothing written, no manifest left claiming ownership |
+| manifest gone, files identical | adopted: manifest re-recorded, tree unchanged |
+| manifest gone, a file differs | refused, exit 4 |
+
+`--force` creates a missing skills root (exit 3 without it) and deliberately does **not**
+override a refusal — the remedy for an unmanaged file is a person moving it, not a flag.
+
+**The installer test found an installer bug.** Detection ran in a function called through a
+command substitution, so `exit 2` on an ambiguous root only terminated the subshell: the user
+got *two* contradictory messages and exit 3. Inlined into the main shell, plus a test that
+the ambiguous case names both roots and exits 2. This is the same class as the three
+report-quality defects in P3 — found by running the thing, not by reading it.
+
+**Three copies of every threshold, now compared.** The linter's `DEFAULT_CONFIG`, the table
+in `references/schema-reference.md`, and the commented defaults in `templates/SCHEMA.md` are
+parsed and asserted equal — ten keys each, with a control that both parsers found all ten
+rather than none. A vault judged by a threshold its own `SCHEMA.md` does not describe is a
+vault nobody can argue with.
+
+**The three references the body promised now exist.** `note-format.md`, `schema-reference.md`
+and `tool-free-fallback.md` join `lint-checks.md`, and the body is asserted to name only
+references that ship — and to leave none unlinked. `tool-free-fallback.md` carries the
+requirement that a manual pass reports which checks it could *not* perform: a partial pass
+must never read as a clean vault.
+
+**Suite:** 514 passed, 0 skipped, 10.6s. `make check` green. `make goldens` added — the one
+path that can make a failing `--check` pass, so it is tested for what it must not do: it
+writes the render byte for byte and refuses to adopt one that fails validation.
+
 ## P3 — Checks (2026-09-26)
 
 **32 codes, 7 fixtures, 44 expected findings, and every fixture matches its manifest in

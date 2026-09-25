@@ -174,3 +174,50 @@ def test_golden_files_live_where_the_renderer_expects_them():
     for platform in PLATFORMS:
         assert GOLDEN == REPO / "tests" / "golden"
         assert (GOLDEN / f"{platform}.SKILL.md").is_file()
+
+
+# --- adopting a new golden ----------------------------------------------------------
+#
+# `--update-goldens` is the one path that can make a failing `--check` pass, which is
+# exactly the shape of a tool that gets used to hide a regression. So it is tested for
+# what it must not do as well as what it must: it writes the render, byte for byte, and
+# it refuses to adopt one that fails validation.
+
+
+def test_adopting_a_golden_writes_the_render_byte_for_byte(tmp_path, monkeypatch):
+    monkeypatch.setattr(render, "GOLDEN", tmp_path)
+    assert render.main(["--update-goldens"]) == 0
+    for platform in PLATFORMS:
+        assert (tmp_path / f"{platform}.SKILL.md").read_text(encoding="utf-8") == render.render(
+            platform
+        )
+
+
+def test_adopting_twice_changes_nothing_the_second_time(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(render, "GOLDEN", tmp_path)
+    render.main(["--update-goldens"])
+    capsys.readouterr()
+    assert render.main(["--update-goldens"]) == 0
+    assert capsys.readouterr().out.count("unchanged") == len(PLATFORMS)
+
+
+def test_a_golden_that_fails_validation_is_never_adopted(tmp_path, monkeypatch, capsys):
+    """The control on the control: `--check` failing must not be repairable by adopting a
+    render the validator rejects."""
+    monkeypatch.setattr(render, "GOLDEN", tmp_path)
+
+    def broken(platform: str) -> str:
+        return "---\nname: zettelkasten\ndescription: d\n---\n\n   \n"
+
+    monkeypatch.setattr(render, "render", broken)
+    assert render.main(["--update-goldens"]) == 1
+    assert list(tmp_path.glob("*.SKILL.md")) == [], "an invalid render was written as a golden"
+    assert "FAILED validation" in capsys.readouterr().err
+
+
+def test_the_adopted_golden_is_the_one_check_then_accepts(tmp_path, monkeypatch):
+    """The round trip: adopt, then check against the adopted copy, in a directory that has
+    never held a golden before."""
+    monkeypatch.setattr(render, "GOLDEN", tmp_path)
+    assert render.main(["--update-goldens"]) == 0
+    assert render.main(["--check"]) == 0

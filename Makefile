@@ -1,4 +1,4 @@
-.PHONY: check render test lint-fixtures clean
+.PHONY: check render goldens test lint-fixtures clean
 
 UV := uv run --with pytest --with pyyaml
 
@@ -7,6 +7,9 @@ check: ## render in memory and diff against tests/golden/ (what CI runs)
 
 render: ## write all three renders to dist/ for eyeballing
 	python3 src/render.py --out dist
+
+goldens: ## adopt the current renders as the golden oracle — then read `git diff tests/golden/`
+	python3 src/render.py --update-goldens
 
 test: ## full suite (no model, no network, writes only to tmp)
 	$(UV) pytest tests/ -q

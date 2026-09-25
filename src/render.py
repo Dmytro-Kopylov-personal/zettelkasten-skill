@@ -228,10 +228,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--platform", choices=sorted(PLATFORMS), help="render one platform")
     parser.add_argument("--out", type=Path, help="write renders to this directory")
     parser.add_argument("--check", action="store_true", help="diff renders against tests/golden/")
+    parser.add_argument(
+        "--update-goldens",
+        action="store_true",
+        help="adopt the current renders as the golden oracle (then read `git diff tests/golden/`)",
+    )
     parser.add_argument("--list", action="store_true", help="list platforms with sizes")
     args = parser.parse_args(argv)
 
-    if not (args.platform or args.check or args.list or args.out):
+    if not (args.platform or args.check or args.list or args.out or args.update_goldens):
         parser.print_help()
         return 2
 
@@ -262,6 +267,14 @@ def main(argv: list[str] | None = None) -> int:
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_text(text, encoding="utf-8")
             print(f"wrote {destination}")
+
+        if args.update_goldens:
+            golden = GOLDEN / f"{platform}.SKILL.md"
+            golden.parent.mkdir(parents=True, exist_ok=True)
+            before = golden.read_text(encoding="utf-8") if golden.is_file() else None
+            golden.write_text(text, encoding="utf-8")
+            state = "unchanged" if before == text else "updated"
+            print(f"{platform}: {state} ({_display(golden)})")
 
         if args.check:
             golden = GOLDEN / f"{platform}.SKILL.md"

@@ -36,12 +36,36 @@ docs/         design notes, the plan, and measured results
 `tests/golden/<platform>.SKILL.md`, which is both the reviewable artifact and the
 byte-exact oracle `--check` diffs against. One copy, two jobs, no drift.
 
+## Install
+
+```bash
+./install.sh --platform hermes          # detect the root if you leave --platform out
+./install.sh --platform copilot --project-root /path/to/repo
+./install.sh --platform claude --dry-run
+```
+
+It renders, validates, then copies `SKILL.md`, `references/`, `templates/` and `scripts/`
+into the platform's skills tree. Re-running it is a no-op; a file it did not write is
+**refused** (exit 4) rather than overwritten, and a file it did write is backed up to
+`.bak.<utc>` before being replaced. Ownership is recorded as a digest manifest in
+`${XDG_STATE_HOME:-$HOME/.local/state}/zettelkasten-skill/` — outside every skills tree, so
+an OS-level backup cannot carry it into a vault.
+
+Exit codes: 0 ok · 1 render failure · 2 usage · 3 platform not detected · 4 unmanaged file.
+
 ## Use
 
 ```bash
 make check     # render all three platforms and diff against tests/golden/
 make test      # the full suite (uv run --with pytest --with pyyaml)
 make render    # write renders to dist/
+make goldens   # adopt the current renders as the oracle — then read the diff
+```
+
+The linter runs against a vault directly, with no install step at all:
+
+```bash
+python3 -I skill/scripts/zettel_lint.py /path/to/vault --json
 ```
 
 No virtualenv, no `pip install`, no third-party imports: `render.py` and the bundled
@@ -50,7 +74,7 @@ suite is the only part that wants `uv`, and it uses it to fetch its own dependen
 
 ## Why it is built this way
 
-Four findings came from running the platforms' own code rather than trusting the spec.
+Five findings came from running the platforms' own code rather than trusting the spec.
 Each one changed the design, and each is pinned by a test:
 
 - **`platforms:` in Hermes is an OS gate, not an agent gate.** `platforms: [copilot, hermes]`
@@ -66,15 +90,22 @@ Each one changed the design, and each is pinned by a test:
   ("read the note", never `` `read_file` ``), and a denylist enforces it over the
   template and every shipped reference file — with a positive and a negative control, so
   neither a check that flags everything nor one that flags nothing can pass.
+- **Naive wikilink scanning false-positives on contact.** `[[500, 375]]` from a NumPy
+  expression inside a code fence is the top match in a real vault, and `[[wikilinks]]` in
+  prose *describing* wikilinks is the second. Code fences and inline code are stripped
+  before extraction, and a fixture of four such traps asserts they stay silent.
 
 The same reasoning drives the linter: it is verified against hand-labelled fixtures whose
 `MANIFEST.md` is written before the code runs, and a check that cannot run says so in
-`skipped_checks` rather than reporting a clean result.
+`skipped_checks` rather than reporting a clean result. Matching a manifest is not enough
+on its own — it shows the right findings appeared, not that the right *check* produced
+them — so each expected finding is attributed by silencing its check in the registry and
+requiring exactly that check's findings to disappear.
 
 ## Status
 
-Early. The render layer and its tests are complete and green; the linter, installer and
-platform acceptance runs are in progress. `docs/plan.md` carries the phase gates, and
+The render layer, the linter and the installer are complete and green (514 tests); the
+platform acceptance runs are outstanding. `docs/plan.md` carries the phase gates, and
 `docs/results.md` records what has actually been measured.
 
 ## Licence

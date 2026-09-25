@@ -130,8 +130,11 @@ Only when the folder is not already a vault, and only after asking where it live
 
 1. Confirm the vault path and whether the folder is empty.
 2. Create `raw/articles`, `raw/papers`, `raw/notes`, `permanent`, `structure`, `inbox`.
-3. Materialise `SCHEMA.md` from `templates/SCHEMA.md`, `structure/index.md` from `templates/index.md`,
-   `structure/concept-table.md`, `structure/overview.md`, and `log.md` from `templates/log.md`.
+3. Materialise the scaffold, one template per file: `SCHEMA.md` from `templates/SCHEMA.md`,
+   `structure/index.md` from `templates/index.md`, `structure/concept-table.md` from
+   `templates/concept-table.md`, `structure/overview.md` from `templates/overview.md`, and
+   `log.md` from `templates/log.md`. Leave the examples inside their code fences — they show
+   the format, and an unfenced one would be read as a real entry.
 4. Ask the user what domain the vault covers, and write it into `SCHEMA.md` — a vault without a
    domain accumulates everything and links nothing.
 5. Propose one or two first sources to ingest rather than leaving them at an empty vault.

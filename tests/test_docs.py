@@ -145,6 +145,74 @@ def test_the_labels_are_checked_as_labels():
     assert len(set(ENTRY_LABELS)) == len(ENTRY_LABELS)
 
 
+# --- the other references the shipped body promises -----------------------------------
+
+
+def references() -> set[str]:
+    return {path.name for path in (REPO / "skill" / "references").glob("*.md")}
+
+
+def test_the_body_points_at_references_that_ship():
+    """A reference the body names and we do not ship is an instruction the agent cannot
+    follow, discovered at the moment it is following it."""
+    body = (REPO / "src" / "SKILL.template.md").read_text(encoding="utf-8")
+    named = set(re.findall(r"references/([A-Za-z-]+\.md)", body))
+    assert named <= references(), f"the body names {sorted(named - references())}"
+
+
+def test_no_reference_ships_unlinked():
+    """The other direction: a file nothing names is a file the agent will never open."""
+    body = (REPO / "src" / "SKILL.template.md").read_text(encoding="utf-8")
+    named = set(re.findall(r"references/([A-Za-z-]+\.md)", body))
+    linked_elsewhere = set()
+    for path in (REPO / "skill" / "references").glob("*.md"):
+        if path.name == "lint-checks.md":
+            continue
+        linked_elsewhere |= set(
+            re.findall(r"references/([A-Za-z-]+\.md)", path.read_text(encoding="utf-8"))
+        )
+    orphaned = references() - named - linked_elsewhere
+    assert not orphaned, f"nothing points at {sorted(orphaned)}"
+
+
+# --- the thresholds, which are written down in three places ---------------------------
+
+THRESHOLD_ROW = re.compile(r"^\|\s*`lint_(?P<key>[a-z_]+)`\s*\|\s*(?P<value>[\d.]+)\s*\|", re.M)
+TEMPLATE_LINE = re.compile(r"^#\s*lint_(?P<key>[a-z_]+):\s*(?P<value>[\d.]+)\s*$", re.M)
+
+
+def documented_thresholds() -> dict[str, float]:
+    """The table in `schema-reference.md`, keyed without the `lint_` prefix."""
+    text = (REPO / "skill" / "references" / "schema-reference.md").read_text(encoding="utf-8")
+    return {match.group("key"): float(match.group("value")) for match in THRESHOLD_ROW.finditer(text)}
+
+
+def templated_thresholds() -> dict[str, float]:
+    """The commented defaults in the SCHEMA.md template the init protocol copies."""
+    text = (REPO / "skill" / "templates" / "SCHEMA.md").read_text(encoding="utf-8")
+    return {
+        match.group("key"): float(match.group("value")) for match in TEMPLATE_LINE.finditer(text)
+    }
+
+
+def test_the_default_thresholds_are_documented_and_the_document_is_right():
+    """Three copies exist: the linter's table, the reference's table, and the template's
+    commented defaults. A threshold that differs between them is a vault being judged by a
+    rule its own `SCHEMA.md` does not describe."""
+    defaults = {key: float(value) for key, value in zettel_lint.DEFAULT_CONFIG.items()}
+    assert documented_thresholds() == defaults
+    assert templated_thresholds() == defaults
+
+
+def test_the_threshold_parsers_would_notice_a_missing_row():
+    """Control: both parsers key on a pattern, and a pattern that matched nothing would
+    make the comparison above pass with an empty dict on both sides."""
+    defaults = {key: float(value) for key, value in zettel_lint.DEFAULT_CONFIG.items()}
+    assert len(defaults) == 10
+    assert len(documented_thresholds()) == 10
+    assert len(templated_thresholds()) == 10
+
+
 # --- the limits that are recorded rather than silently omitted ------------------------
 
 DROPPED = {
