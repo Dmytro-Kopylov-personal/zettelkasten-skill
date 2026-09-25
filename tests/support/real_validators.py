@@ -19,6 +19,7 @@ from pathlib import Path
 
 HERMES_ROOT = Path.home() / ".hermes" / "hermes-agent"
 HERMES_TOOL = HERMES_ROOT / "tools" / "skill_manager_tool.py"
+HERMES_SKILL_UTILS = HERMES_ROOT / "agent" / "skill_utils.py"
 SKILL_CREATOR = Path.home() / ".hermes" / "skills" / "anthropic" / "skill-creator"
 QUICK_VALIDATE = SKILL_CREATOR / "scripts" / "quick_validate.py"
 
@@ -55,6 +56,40 @@ def check_hermes(text: str) -> tuple[list[str], str]:
         return [], reason
     problems = [p for p in (module._validate_frontmatter(text), module._validate_content_size(text)) if p]
     return problems, ""
+
+
+def hermes_skill_utils() -> tuple[object | None, str]:
+    """Hermes' frontmatter parser and OS gate — the code that decides visibility."""
+    return _load(
+        "hermes_skill_utils",
+        HERMES_SKILL_UTILS,
+        syspath=(HERMES_ROOT, HERMES_ROOT / "agent"),
+    )
+
+
+def hermes_visibility(text: str, *, force_fallback: bool = False) -> tuple[dict, bool | None, str]:
+    """Parse a render with Hermes' parser and ask Hermes' own OS gate.
+
+    With `force_fallback`, the YAML loader is made to raise — which is what happens in
+    the field when PyYAML is missing *or* any line of the frontmatter fails to parse.
+    `parse_frontmatter` then splits on the first colon of every line, and a flow list
+    becomes a string. Returns (frontmatter, matches_platform, reason).
+    """
+    module, reason = hermes_skill_utils()
+    if module is None:
+        return {}, None, reason
+
+    def _explode(_content: str):
+        raise RuntimeError("yaml unavailable, or the frontmatter did not parse")
+
+    original = module._yaml_load_fn
+    if force_fallback:
+        module._yaml_load_fn = _explode
+    try:
+        frontmatter, _ = module.parse_frontmatter(text)
+    finally:
+        module._yaml_load_fn = original
+    return frontmatter, module.skill_matches_platform(frontmatter), ""
 
 
 def check_claude(skill_dir: Path) -> tuple[list[str], str]:

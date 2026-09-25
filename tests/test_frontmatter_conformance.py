@@ -60,6 +60,38 @@ def test_claude_validator_rejects_what_it_should(tmp_path):
     assert problems and "Unexpected key" in problems[0]
 
 
+def test_the_hermes_render_survives_hermes_own_parser():
+    """V6: `platforms` must come out of the *real* parser as a list, or Hermes hides us.
+
+    Hermes' OS gate reads `frontmatter["platforms"]` and falls back to wrapping a
+    non-list in a one-element list, so a string can never match and the skill is
+    silently absent. This asserts the shipped render against the installed parser.
+    """
+    text = (GOLDEN / "hermes.SKILL.md").read_text(encoding="utf-8")
+    frontmatter, matches, reason = real_validators.hermes_visibility(text)
+    if reason:
+        pytest.skip(reason)
+    assert isinstance(frontmatter["platforms"], list), frontmatter["platforms"]
+    assert matches is True
+
+
+def test_the_same_frontmatter_would_hide_the_skill_without_yaml():
+    """Control for V6 — proves the test above can fail, and names the failure.
+
+    With the YAML loader forced to raise, Hermes' fallback splits on the first colon:
+    `platforms: [linux, macos, windows]` becomes the *string* `"[linux, macos, windows]"`,
+    which no OS name starts with. The block form would fail open instead, but every one
+    of the 85 OS-gated skills in this tree declares the flow form, so the degraded parser
+    hides all of them and the remedy belongs upstream, not in one skill's fragment.
+    """
+    text = (GOLDEN / "hermes.SKILL.md").read_text(encoding="utf-8")
+    frontmatter, matches, reason = real_validators.hermes_visibility(text, force_fallback=True)
+    if reason:
+        pytest.skip(reason)
+    assert frontmatter["platforms"] == "[linux, macos, windows]"
+    assert matches is False
+
+
 @pytest.mark.parametrize("platform", PLATFORMS)
 def test_the_local_rules_agree_with_the_real_validators_for_claude(platform, tmp_path):
     """Where both layers can speak, they must not contradict each other."""
