@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import datetime as dt
 import importlib.util
+import json
 import sys
 
 import pytest
@@ -244,33 +245,100 @@ def test_the_documented_note_format_parses_the_same_way_twice():
 # --- every fixture block is swept in as well ---------------------------------------
 
 
+def manifest_parse_failures() -> set[str]:
+    """Fixture paths their own `expected.json` declares as ZK002.
+
+    The sweep asks the manifest, not the directory name. `vault_hostile` holds files that
+    are meant to fail parsing *and* files that are meant to succeed (the CRLF control), so
+    "this file is in the hostile fixture" answers the wrong question.
+    """
+    declared: set[str] = set()
+    if not FIXTURES.exists():
+        return declared
+    for path in sorted(FIXTURES.glob("*/expected.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        for code, file, _subject in data["findings"]:
+            if code == "ZK002":
+                declared.add(f"{path.parent.name}/{file}")
+    return declared
+
+
+#: Fixture files whose ZK002 this sweep cannot reproduce, each with the reason. They are
+#: still asserted by `tests/test_lint_checks.py`, which compares the reported ZK002 set with
+#: the manifest; what is lost here is only the second opinion from PyYAML.
+UNSWEEPABLE = {
+    "vault_hostile/permanent/202609280906-no-frontmatter.md": "there is no frontmatter block to hand to either parser",
+    "vault_hostile/permanent/202609280907-byte-order-mark.md": "the fence is not at offset 0, so the split finds nothing",
+    "vault_hostile/permanent/202609280909-latin-1.md": "the bytes are not valid UTF-8, so a re-decode is not the same document",
+}
+
+
 def fixture_frontmatters() -> list[tuple[str, str]]:
+    """(name, frontmatter text) for every fixture file that has a readable frontmatter."""
     if not FIXTURES.exists():
         return []
     cases = []
     for path in sorted(FIXTURES.rglob("*.md")):
-        if path.name in {"MANIFEST.md", "expected.json", "README.md"}:
+        if path.name in {"MANIFEST.md", "README.md"}:
             continue
-        text = path.read_text(encoding="utf-8", errors="replace")
-        frontmatter, _ = zettel_lint.split_frontmatter_bytes(text.encode("utf-8"))
-        if frontmatter:
-            cases.append((str(path.relative_to(FIXTURES)), frontmatter.decode("utf-8", "replace")))
+        raw = path.read_bytes()
+        name = str(path.relative_to(FIXTURES))
+        if name in UNSWEEPABLE:
+            continue
+        frontmatter, _ = zettel_lint.split_frontmatter_bytes(raw)
+        if not frontmatter:
+            continue
+        try:
+            cases.append((name, frontmatter.decode("utf-8")))
+        except UnicodeDecodeError:
+            continue
     return cases
 
 
 def test_fixtures_exist_to_sweep():
-    """Not a gate on its own — it fails only once fixtures are expected and none parse."""
     if not FIXTURES.exists():
         pytest.skip("no fixtures yet")
+    assert fixture_frontmatters(), "the sweep found nothing to compare"
 
 
-@pytest.mark.parametrize("name, text", fixture_frontmatters(), ids=[c[0] for c in fixture_frontmatters()])
+def test_every_declared_parse_failure_is_either_swept_or_named():
+    """Closed loop on the exceptions above.
+
+    A fixture file added to a manifest as unparseable must either be swept here (so PyYAML
+    gets a say) or appear in `UNSWEEPABLE` with a reason. Otherwise a new hostile file could
+    be declared in a manifest and quietly never be examined by this module at all.
+    """
+    swept = {name for name, _ in fixture_frontmatters()}
+    declared = manifest_parse_failures()
+    # Every declared failure is swept or explained...
+    assert declared <= swept | set(UNSWEEPABLE), (
+        f"declared but neither swept nor explained: {sorted(declared - swept - set(UNSWEEPABLE))}"
+    )
+    # ...and every exemption is declared, so the list cannot become a place to hide a file
+    # from both this module and the manifest.
+    assert set(UNSWEEPABLE) <= declared, (
+        f"exempted from the sweep but not declared as a parse failure: "
+        f"{sorted(set(UNSWEEPABLE) - declared)}"
+    )
+    # The sweep is not only parse failures: valid fixtures are swept too, which is the
+    # whole point of running both parsers over them.
+    assert swept - declared, "the sweep found nothing but unparseable files"
+
+
+@pytest.mark.parametrize(
+    "name, text", fixture_frontmatters(), ids=[case[0] for case in fixture_frontmatters()]
+)
 def test_every_fixture_frontmatter_agrees_with_pyyaml(name, text):
     expected, pyyaml_parsed = pyyaml_mapping(text)
     data, error, line = parse(text)
-    hostile = "vault_hostile" in name
-    if hostile:
-        assert error is not None, f"{name}: a hostile fixture parsed cleanly"
+    if name in manifest_parse_failures():
+        # The manifest says this file cannot be parsed, so the parser must refuse it — and
+        # must say where. PyYAML's verdict is deliberately not asserted here: these files
+        # include constructs PyYAML accepts (block scalars, anchors, duplicate keys) and
+        # constructs it rejects (tabs, unclosed quotes), and which side each is on is
+        # already pinned, by name, in WE_ARE_STRICTER and BOTH_REJECT above.
+        assert error is not None, f"{name}: the manifest expects ZK002, but the parser read it"
+        assert isinstance(line, int) and line >= 1, f"{name}: a refusal with no line number"
         return
     assert error is None, f"{name}: line {line}: {error}"
     assert data == expected, f"{name}: {data!r} != {expected!r}"

@@ -1,0 +1,5 @@
+---
+domain: hostile input
+---
+
+# Schema

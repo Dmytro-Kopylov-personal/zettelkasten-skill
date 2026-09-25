@@ -1,0 +1,9 @@
+{
+  "_comment": "False-positive attractors that must produce nothing, and one real defect that must. The four notes carry [[500, 375]] in a python fence, [[wikilinks]] in inline code, a tilde fence, a markdown link written [[1](url)], a colon and a hash inside quoted scalars — all of which a naive scanner reports as links. The orphan is the other direction: it is listed in structure/index.md, and index links are excluded from the inbound count, so being indexed does not make it linked.",
+  "exit": {"error": 0, "warn": 1, "info": 1},
+  "metrics": {"notes": 4, "raw_sources": 1, "links": 8, "orphan_rate": 0.25},
+  "not_applicable": ["ZK016", "ZK024", "ZK027", "ZK029", "ZK031"],
+  "findings": [
+    ["ZK011", "permanent/202609280904-isolated-claim.md", "202609280904-isolated-claim"]
+  ]
+}

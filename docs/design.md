@@ -101,10 +101,20 @@ the inside.
 - Fixtures ship a `MANIFEST.md` enumerating by hand which defect each file carries, written
   *before* the linter runs, plus `expected.json`. `vault_defects` asserts **set equality**,
   so a file carrying an unlisted defect fails even when the total matches.
+- **Set equality does not prove *which* check fired.** So each expected finding is
+  attributed: the code is removed from the registry, the report recomputed, and the lost
+  findings must equal exactly the ones the manifest credits to it. Without this, a check
+  that had quietly become a no-op would be covered by a neighbour firing on the same note.
 - `vault_trap` is built from false-positive attractors **and** one genuine orphan whose only
   inbound link comes from `index.md` — it must still be flagged, so the trap cuts both ways.
 - `vault_hostile` proves exclusion rather than vacuous passing: one `ZK002` per unsupported
   construct, and nothing else from that file.
+- `vault_minimal` names the checks that had no surface to examine, and `vault_monoculture`
+  pins the one vault-level statistic — a check whose input is absent is reported as
+  not-applicable, never counted as a pass.
+- `references/lint-checks.md` is asserted against the *emitter*: each code is run through
+  `Finding.as_dict()` and the resulting `doc` string must resolve to a section headed with
+  that code, at the severity the registry assigns it.
 - Two independent implementations of the platform rules (`src/render.py`,
   `tests/support/platform_rules.py`) run over the same corpus and must agree on every
   document, good and bad. The real validators (Hermes' `_validate_frontmatter`, Anthropic's

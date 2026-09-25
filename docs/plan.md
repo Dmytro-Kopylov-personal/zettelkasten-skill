@@ -8,7 +8,7 @@ is met by something measured, not by something written.
 | **P0** Scaffold | `git init`, README/LICENSE/.gitignore/Makefile, commit-msg hook, private GitHub repo, vault project doc + catalog entry | the hook demonstrably rejects an AI co-author trailer | repo URL, hook output |
 | **P1** Render | template body, 6 fragments, `render.py`, goldens, render/invariant tests | three goldens byte-identical twice; denylist passes **with both controls**; shared-body invariant green; `--check` exits 0 | char/line counts vs budgets, control results |
 | **P2** Parser | `zettel_lint.py` core: YAML subset parser, byte-exact frontmatter split, `Vault` model, wikilink + provenance-marker extraction, `hash` | parser matches `yaml.safe_load` on every fixture block; each unsupported construct raises with the right line; wikilink extraction returns `[]` on all four V3 traps | differential pass count |
-| **P3** Checks | 31 checks, JSON/text contract, `--fail-on`, `--baseline`, exit codes, all fixtures + MANIFESTs | `vault_defects` matches its manifest in both directions; `vault_trap` == 1 finding; `vault_clean` == 0; `vault_hostile` == the exact `ZK002` set; `not_a_vault` exits 2; determinism + read-only proofs green | per-fixture counts, baseline round-trip |
+| **P3** Checks | 32 checks, `references/lint-checks.md` 1:1, JSON/text contract, `--fail-on`, `--baseline`, exit codes, all fixtures + MANIFESTs | `vault_defects` matches its manifest in both directions; every expected finding is attributable to its own check by silencing it; `vault_trap` == 1 finding; `vault_clean` == 0; `vault_hostile` == the exact `ZK002` set; `not_a_vault` exits 2; every `doc` anchor resolves; determinism + read-only proofs green | per-fixture counts, baseline round-trip |
 | **P4** Install + init | `install.sh` (5-case manifest, `--dry-run`, platform detection), `templates/`, init protocol | install twice byte-identical; all five cases pass; an init'd vault lints clean | tree-hash proof, case results |
 | **P5** Hermes | install, `hermes curator pin zettelkasten`, fresh-session visibility, N=3 scripted ingest | `hermes skills list` shows it; the catalog line is not truncated mid-trigger; pass rate recorded | install log, list output, pin confirmation, N=3 results |
 | **P6** Claude | `quick_validate.py`, `claude plugin validate --strict`, `/skills`, eval with an ablation | both validators exit 0; discovered; the `allowed-tools` decision recorded as verified or deferred | validator output, discovery + eval evidence |
@@ -17,6 +17,10 @@ is met by something measured, not by something written.
 
 Order follows the spec: Hermes first (clearer debugging output), then Claude (free, same
 machine), then Copilot — which cannot be verified here beyond its CLI.
+
+The check count was an estimate when the three tiers were sketched; the registry settled at
+**32** codes (`ZK001`–`ZK032`), 15 `error` / 7 `warn` / 10 `info`, each documented 1:1 in
+`skill/references/lint-checks.md` and exercised by at least one fixture.
 
 ## Decisions taken
 

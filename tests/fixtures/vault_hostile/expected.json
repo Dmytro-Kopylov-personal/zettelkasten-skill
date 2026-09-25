@@ -1,0 +1,28 @@
+{
+  "_comment": "Eight files whose frontmatter cannot be read, each producing exactly one ZK002 and nothing else: the point is that a file the parser gave up on is excluded from the checks that read its frontmatter, not treated as an empty one (which would produce a fistful of ZK003s and a ZK010). The three CRLF notes are the control in the other direction — a Windows-authored note is still a note, so they parse, link and produce nothing.",
+  "exit": {"error": 1, "warn": 1, "info": 1},
+  "metrics": {"notes": 11, "raw_sources": 0, "links": 6, "orphan_rate": 0.0},
+  "not_applicable": [
+    "ZK012",
+    "ZK013",
+    "ZK014",
+    "ZK016",
+    "ZK018",
+    "ZK019",
+    "ZK024",
+    "ZK026",
+    "ZK027",
+    "ZK029",
+    "ZK031"
+  ],
+  "findings": [
+    ["ZK002", "permanent/202609280901-tab-indent.md", "frontmatter"],
+    ["ZK002", "permanent/202609280902-unclosed-quote.md", "frontmatter"],
+    ["ZK002", "permanent/202609280903-block-scalar.md", "frontmatter"],
+    ["ZK002", "permanent/202609280904-anchor.md", "frontmatter"],
+    ["ZK002", "permanent/202609280905-duplicate-key.md", "frontmatter"],
+    ["ZK002", "permanent/202609280906-no-frontmatter.md", "frontmatter"],
+    ["ZK002", "permanent/202609280907-byte-order-mark.md", "frontmatter"],
+    ["ZK002", "permanent/202609280909-latin-1.md", "frontmatter"]
+  ]
+}

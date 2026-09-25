@@ -1,0 +1,17 @@
+{
+  "_comment": "One finding, and it is a statistic about the whole vault rather than about a file: every one of the eight links uses the verb 'supports'. The vault is otherwise well formed, which is the point — a collapsed verb taxonomy is not detectable in any single note. The fixture lowers verb_monoculture_min_links from 20 to 6 so a four-note vault can carry the measurement; exit stays 0 at the default threshold because the finding is advisory.",
+  "exit": {"error": 0, "warn": 0, "info": 1},
+  "metrics": {"notes": 4, "raw_sources": 0, "links": 8, "orphan_rate": 0.0},
+  "not_applicable": [
+    "ZK013",
+    "ZK014",
+    "ZK016",
+    "ZK018",
+    "ZK019",
+    "ZK024",
+    "ZK026",
+    "ZK027",
+    "ZK031"
+  ],
+  "findings": [["ZK029", "", "supports"]]
+}
