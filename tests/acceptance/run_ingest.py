@@ -55,12 +55,29 @@ PROTOCOL = {
 }
 VAULT_DIRS = ("raw/articles", "raw/papers", "raw/notes", "permanent", "structure", "inbox")
 
-#: Tools that put bytes on disk. Named rather than pattern-matched: a predicate that quietly
+#: A line that enumerates an intended action: `- x`, `* x`, `1. x`, `2) x`, indented or not.
+#: Written as a pattern for the marker rather than a literal `1.` after a plan that used
+#: `  2.`, `  3.` … was read as a single item and failed a run that had done nothing wrong.
+LIST_ITEM_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+\S")
+
+#: Hermes' file-mutation tools, named rather than pattern-matched: a predicate that quietly
 #: stopped matching would make the ordering marker unable to fail.
+#:
+#: `patch` belongs here and was missing at first — it was the tool that made a real run's
+#: first write, so the marker was reading "first write" from a later message and would have
+#: missed a plan-less write that happened to use it.
+#:
+#: Deliberately **not** here: `terminal` and `execute_code`, which can write but are mostly
+#: how the agent reads. Counting them would fire the marker on every `ls` and fail runs that
+#: did nothing wrong. The cost is the mirror image — an agent that writes a vault file
+#: through shell redirection before proposing is not caught by this marker. Nothing else in
+#: the run is blinded to that: the vault is linted afterwards, and the log and index markers
+#: are read from the files themselves.
 WRITE_TOOLS = frozenset(
     {
         "write_file", "write", "create_file", "edit_file", "edit", "str_replace",
-        "multi_edit", "apply_patch", "insert_text", "append_file", "create_directory",
+        "multi_edit", "apply_patch", "patch", "insert_text", "append_file",
+        "create_directory",
     }
 )
 
@@ -148,7 +165,7 @@ def export_session(session_id: str) -> dict:
     return json.loads(result.stdout.strip().splitlines()[0])
 
 
-def run_agent(vault: Path, source_path: Path, *, timeout: int) -> tuple[str, dict]:
+def run_agent(vault: Path, source_path: Path, *, timeout: int) -> tuple[str, dict, str]:
     """One `hermes -z` run, with approvals as Hermes is configured. `-z` prints no session
     id, so the new one is whichever id was not in the listing before the run."""
     prompt = (
@@ -165,8 +182,9 @@ def run_agent(vault: Path, source_path: Path, *, timeout: int) -> tuple[str, dic
         timeout=timeout,
     )
     new = session_ids() - before
-    record = export_session(sorted(new)[-1]) if new else {}
-    return result.stdout, record
+    session_id = sorted(new)[-1] if new else ""
+    record = export_session(session_id) if session_id else {}
+    return result.stdout, record, session_id
 
 
 # --- the markers -------------------------------------------------------------------------
@@ -189,26 +207,38 @@ def write_calls(messages: list[dict]) -> list[int]:
 def proposed_first(messages: list[dict]) -> tuple[bool, str]:
     """Prose naming at least two candidate notes, before the first write.
 
-    The structural half (prose precedes the write) is exact. The second half asks the prose to
-    be a plan rather than a remark, which is why the text is returned: a keyword test cannot
-    judge whether a plan is a plan, so the raw proposal is recorded for a human to read.
+    The plan and the first write calls can share one assistant message: a model that states a
+    plan and then acts on it emits both in a single turn, and whether the two land in one
+    message or two is a detail of the runtime rather than of the protocol. So the plan counts
+    if it appears **at or before** the first write — what must not happen is a write with no
+    plan stated anywhere before it. That is the failure this marker exists to catch.
+
+    The structural half is exact. The second half asks the prose to be a plan rather than a
+    remark, which is why the text is returned: a keyword test cannot judge whether a plan is a
+    plan, so the raw proposal is recorded for a human to read.
     """
     first_write = next(iter(write_calls(messages)), None)
     if first_write is None:
         return False, "the agent never wrote anything"
-    for message in messages[:first_write]:
+    remarks = False
+    for message in messages[: first_write + 1]:
         if message.get("role") != "assistant":
             continue
         text = (message.get("content") or "").strip()
-        if len(text) < 80:
+        if not text:
             continue
-        bullets = [
-            line for line in text.splitlines() if line.strip().startswith(("-", "*", "1."))
-        ]
+        remarks = True
+        # A floor against degenerate matches, not a judgement of the plan's worth: two
+        # enumerated actions in a sentence is a thin plan, but it is still a stated plan.
+        if len(text) < 40:
+            continue
+        items = [line for line in text.splitlines() if LIST_ITEM_RE.match(line)]
         mentions = len(re.findall(r"\bnote\b", text, flags=re.IGNORECASE))
-        if len(bullets) >= 2 or mentions >= 2:
+        if len(items) >= 2 or mentions >= 2:
             return True, text[:2000]
-    return False, "prose appeared before the first write, but nothing that reads as a plan"
+    if remarks:
+        return False, "prose preceded the first write, but nothing that reads as a plan"
+    return False, "the first write carried no prose at all — no plan was stated"
 
 
 def count_log_entries(text: str) -> int:
@@ -254,6 +284,49 @@ def lint_vault(vault: Path) -> tuple[dict, int]:
     return zettel_lint.lint_vault(vault, {}, dt.date.today(), set(), zettel_lint.ERROR)
 
 
+def rescore(path: Path) -> int:
+    """Recompute the transcript-derived markers from the stored sessions.
+
+    The vault is gone and the model has already run, but Hermes keeps the session, so a
+    correction to how the transcript is read costs nothing to apply — which matters when the
+    alternative is re-spending a model budget to re-derive a fact already on disk.
+    """
+    results = json.loads(path.read_text(encoding="utf-8"))
+    for result in results:
+        session_id = result.get("session_id")
+        if not session_id:
+            print(f"run {result['run']}: no session id stored, left as it was")
+            continue
+        record = export_session(session_id)
+        messages = record.get("messages") or []
+        if not messages:
+            print(f"run {result['run']}: session {session_id} produced no messages")
+            continue
+        proposed, proposal = proposed_first(messages)
+        was = result["proposed_first"]
+        result.update(
+            proposed_first=proposed,
+            proposal=proposal,
+            write_calls=len(write_calls(messages)),
+            messages=len(messages),
+        )
+        result["passed"] = bool(
+            result["vault_lints_clean"]
+            and result["proposed_first"]
+            and result["log_entry"]
+            and result["indexed"]
+            and result["linked"]
+        )
+        change = "" if was == proposed else f"   (was {was})"
+        print(f"run {result['run']}: proposed_first = {proposed}{change}")
+    path.write_text(json.dumps(results, indent=2), encoding="utf-8")
+    passed = sum(1 for r in results if r["passed"])
+    print(f"\n{passed}/{len(results)} passed after re-scoring")
+    for marker in MARKERS:
+        print(f"  {marker:18s} {sum(1 for r in results if r[marker])}/{len(results)}")
+    return 0 if passed == len(results) else 1
+
+
 # --- the run loop ------------------------------------------------------------------------
 
 
@@ -268,13 +341,14 @@ def one_run(number: int, *, timeout: int) -> dict:
     source.write_text(SOURCE, encoding="utf-8")
 
     before = snapshot(vault)
-    stdout, record = run_agent(vault, source, timeout=timeout)
+    stdout, record, session_id = run_agent(vault, source, timeout=timeout)
     after = snapshot(vault)
 
     document, code = lint_vault(vault)
     result = {
         "run": number,
         "vault": str(vault),
+        "session_id": session_id,
         "vault_lints_clean": code == 0 and document["findings"] == [],
         "findings": [
             {"code": f["code"], "file": f["file"], "message": f["message"]}
@@ -305,7 +379,16 @@ def main() -> int:
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--timeout", type=int, default=900)
     parser.add_argument("--json", type=Path, help="also write the raw results here")
+    parser.add_argument(
+        "--rescore",
+        type=Path,
+        metavar="RESULTS.json",
+        help="recompute the transcript markers from the stored sessions, running nothing",
+    )
     args = parser.parse_args()
+
+    if args.rescore:
+        return rescore(args.rescore)
 
     results = []
     for number in range(1, args.runs + 1):

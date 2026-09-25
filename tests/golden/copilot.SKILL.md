@@ -215,6 +215,14 @@ findings as a hundred problems.
 9. **Reporting a clean lint when checks could not run.** If the linter was unavailable and you did the
    manual pass, name the checks you could not perform. "Clean" is a claim about coverage, not about
    your confidence.
+10. **Letting the digest block the capture.** Write the capture with `sha256: PENDING`, compute the
+    digest of the body, then patch it in — hashing is its own step, and the digest covers body bytes
+    only, so frontmatter written afterwards does not invalidate it. Verify by re-running the digest
+    and comparing the stored body against the source, byte for byte.
+11. **Reaching for `supports` inside a single ingest.** Notes compiled from one source are not
+    independent evidence for each other, and that is exactly what `supports` claims. `extends` and
+    `applies` state the relation honestly, and a reciprocal pair is fine when each direction is true
+    on its own. When a verb you would normally expect is absent, say why in `log.md`.
 
 ## Verification Checklist
 

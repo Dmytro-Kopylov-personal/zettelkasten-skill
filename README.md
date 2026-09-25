@@ -62,6 +62,18 @@ make render    # write renders to dist/
 make goldens   # adopt the current renders as the oracle — then read the diff
 ```
 
+The platform acceptance run is not part of the suite, because it calls a model:
+
+```bash
+python3 tests/acceptance/run_ingest.py --runs 3 --json /tmp/ingest.json
+python3 tests/acceptance/run_ingest.py --rescore /tmp/ingest.json   # no model calls
+```
+
+It builds a throwaway vault by performing Init literally, hands a real agent a source from
+outside it, and scores the result with the shipped linter plus four protocol markers read out
+of the session record. `--rescore` recomputes the transcript markers from stored sessions, so
+a correction to how the transcript is read costs nothing to apply.
+
 The linter runs against a vault directly, with no install step at all:
 
 ```bash
@@ -74,8 +86,8 @@ suite is the only part that wants `uv`, and it uses it to fetch its own dependen
 
 ## Why it is built this way
 
-Five findings came from running the platforms' own code rather than trusting the spec.
-Each one changed the design, and each is pinned by a test:
+Six findings came from running the platforms' own code rather than trusting the spec. Five
+changed the design; the sixth changed what the tests check instead. Each is pinned:
 
 - **`platforms:` in Hermes is an OS gate, not an agent gate.** `platforms: [copilot, hermes]`
   reads perfectly reasonably and makes the skill invisibly absent on every machine. The
@@ -94,6 +106,15 @@ Each one changed the design, and each is pinned by a test:
   expression inside a code fence is the top match in a real vault, and `[[wikilinks]]` in
   prose *describing* wikilinks is the second. Code fences and inline code are stripped
   before extraction, and a fixture of four such traps asserts they stay silent.
+- **Hermes' frontmatter parser has a degraded path that hides the skill.** When PyYAML is
+  missing — or any single line raises — it splits every line on its first colon, so
+  `platforms: [linux, macos, windows]` parses as the *string* `"[linux, macos, windows]"`,
+  which no OS name starts with. The gate wraps it in a one-element list, nothing matches, and
+  the skill is silently absent: the V1 failure through a second door. This one did **not**
+  change the design — all 85 OS-gated skills in a Hermes tree declare it the same way, so the
+  degraded parser hides every one of them and the remedy is upstream. It changed the tests
+  instead: one asserts the shipped render parses under the installed parser to a real list,
+  and a control forces the fallback and asserts it really does hide the skill.
 
 The same reasoning drives the linter: it is verified against hand-labelled fixtures whose
 `MANIFEST.md` is written before the code runs, and a check that cannot run says so in
@@ -104,9 +125,11 @@ requiring exactly that check's findings to disappear.
 
 ## Status
 
-The render layer, the linter and the installer are complete and green (514 tests); the
-platform acceptance runs are outstanding. `docs/plan.md` carries the phase gates, and
-`docs/results.md` records what has actually been measured.
+The render layer, the linter and the installer are complete and green (516 tests). Hermes is
+accepted: installed, listed, pinned, its catalog line verified against a live session's
+system prompt, and a three-run scripted ingest **3/3** with zero findings from every vault
+(`docs/results.md`). Claude and Copilot acceptance are outstanding. `docs/plan.md` carries
+the phase gates.
 
 ## Licence
 

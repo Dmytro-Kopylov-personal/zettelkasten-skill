@@ -2,6 +2,93 @@
 
 Measurements, appended as phases complete. A phase's gate is met here or it is not met.
 
+## P5 — Hermes acceptance (2026-09-26)
+
+**Installed, visible, pinned.** `./install.sh --platform hermes` wrote 11 files into
+`~/.hermes/skills/research/zettelkasten/`, `hermes skills list` shows the row
+(`zettelkasten · research · local · enabled`), and `hermes curator pin zettelkasten` reports
+*"pinned 'zettelkasten' (will bypass auto-transitions)"* — which matters here because the
+curator archives skills it judges stale, and an archived skill is an invisible one.
+
+**The catalog line is verified where the model actually reads it.** Not by re-deriving the
+truncation, but by exporting a live session and looking at the system prompt the agent was
+given:
+
+```
+- zettelkasten: Ingest, query, lint and init a Zettelkasten vault. Use wh...
+- tech-job-market-analysis: Research a tech job market for a specific location, skill...
+```
+
+All four trigger verbs and the name survive the cut; the neighbouring skill's description is
+truncated mid-phrase. That is V2 confirmed end to end rather than modelled.
+
+**A second door to V1, found by running Hermes' parser rather than its validator.** The OS
+gate and the catalogue both read `frontmatter["platforms"]`, and `parse_frontmatter` falls
+back to splitting every line on its first colon when PyYAML is missing *or any line raises*.
+In that mode `platforms: [linux, macos, windows]` becomes the **string**
+`"[linux, macos, windows]"`, the gate wraps it in a one-element list, nothing matches, and
+the skill is silently absent — V1's failure reached without touching the fragment. Measured
+by forcing the fallback, and the block form was measured too: it fails *open* (empty value →
+"compatible with all"). The flow form stays, because all 85 OS-gated skills in this tree
+declare it that way and a degraded parser hides every one of them; the remedy is upstream.
+Two tests carry the finding instead — one asserts the shipped render parses under the
+installed parser to a real list, the other forces the fallback and asserts it really does
+hide the skill, so the guard cannot pass vacuously. A tab in the frontmatter reddens the
+guard, checked by mutation.
+
+**The N=3 ingest: 3/3 passed.** Three one-shot `hermes -z` runs, each into a throwaway vault
+built by performing Init literally from the shipped templates, each handed a source written
+*outside* the vault so the Capture step is exercised rather than bypassed. Scored by the
+shipped linter plus four protocol markers read out of the session record Hermes writes:
+
+| Run | Notes | Links | Orphan rate | Verbs | Lint | Markers |
+|---|---:|---:|---:|---|---|---|
+| 1 | 5 | 11 | 0.00 | applies 3, extends 8 | exit 0, 0 findings | 4/4 |
+| 2 | 5 | 11 | 0.00 | applies 2, extends 9 | exit 0, 0 findings | 4/4 |
+| 3 | 6 | 14 | 0.00 | applies 4, extends 10 | exit 0, 0 findings | 4/4 |
+
+Zero findings from all three vaults, confirmed independently through the CLI
+(`python3 -I skill/scripts/zettel_lint.py <vault>`) rather than only through the library call
+the harness uses. Variance is in the notes produced (5, 5, 6), not in whether the protocol
+held: every run proposed before writing, captured with a digest, linked both directions,
+registered in the index and logged. 145,615 input / 107,629 output tokens across the three.
+
+**The predicted verb collapse did not happen, in any run, on the unpatched skill.** The plan
+names it as a risk: six verbs are too many, and the taxonomy decays to `supports`. Across
+three runs `supports` appears **zero** times. Run 1 did this on the canonical skill — before
+any lesson about verbs existed — so the behaviour is the skill's, not the harness's. Notes
+were also atomic in the intended sense: six note-worthy claims were extracted from a source
+with six separable claims, and run 3's log says why the sixth exists.
+
+**The instrument was wrong three times before it was right, and the controls caught it.**
+`proposed_first` failed run 1 while run 1 had done nothing wrong. The plan and the first
+write calls arrive in **one** assistant message — a detail of the runtime, not of the
+protocol — so the marker was reading past it. Corrected, re-scored: run 3 then failed. Run 3
+had also done nothing wrong: its plan was an *indented numbered list*, and the marker
+recognised only the literal `1.`, reading a five-item plan as one item. Corrected, the
+controls caught a third: `patch` — Hermes' most-used mutation tool, and the tool that made
+run 3's actual first write — was missing from the write set, so "first write" was being read
+from a later message. All three corrections were re-scored **from the stored sessions, with
+no model calls re-run**. The final marker passes 7/7 controls, including both directions:
+a plan in the same message as the write counts, a write with no prose does not, and a plan
+that only appears *after* the write does not.
+
+The lesson is the one this repo keeps re-learning, now about its own acceptance harness:
+three green-looking scoring bugs, each of which would have been recorded as an agent failure.
+A marker that cannot fail and a marker that always fails are indistinguishable until
+something is run against it in both directions.
+
+**An agent edited its own installed skill, and the installer handled it exactly as
+designed.** During run 1 the agent used `skill_manage` to append two pitfalls to
+`~/.hermes/skills/research/zettelkasten/SKILL.md`. Runs 2–3 therefore ran against a
+*patched* skill while run 1 ran against the canonical one — a confound, recorded rather than
+smoothed over. It is probably immaterial: run 1, on the unpatched skill, already showed the
+verb profile the patch described. Both lessons were afterwards adopted into
+`src/SKILL.template.md` as pitfalls 10 and 11 — they record measured behaviour rather than
+guess at it, and the second is a direct answer to a named risk. Re-installing backed the
+agent's edit up to `SKILL.md.bak.20260925T235155Z` and restored the canonical render, so the
+one-way backup trap the plan predicted was exercised by a real event rather than a fixture.
+
 ## P4 — Install and init (2026-09-26)
 
 **The loop closes: the skill's own linter, run over the vault the skill scaffolds, reports
