@@ -1,0 +1,10 @@
+#!/bin/sh
+# Reject AI co-author trailers in commit messages.
+# The author considers "Co-authored-by: Copilot/Claude/etc." traces
+# contamination. Commit messages must look human-written.
+if grep -qiE '^co-authored-by:' "$1"; then
+    echo "ERROR: AI co-author trailers are not allowed in this repo." >&2
+    echo "Remove the 'Co-authored-by:' line from the message and commit again." >&2
+    exit 1
+fi
+exit 0
