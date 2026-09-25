@@ -184,6 +184,65 @@ def test_the_description_is_a_single_sentence_trigger_list():
     assert len(platform_rules.description(doc)) <= 1024
 
 
+WRITE_PATTERNS = (
+    (re.compile(r"""open\s*\([^)]*["'][wax]"""), "open() for writing"),
+    (re.compile(r"\.write_text\(|\.write_bytes\("), "Path.write_text/write_bytes"),
+    (re.compile(r"\bos\.(remove|unlink|rename|replace|makedirs|mkdir|chmod|truncate)\b"), "os mutation"),
+    (re.compile(r"\bshutil\.(rmtree|move|copy|copyfile)\b"), "shutil mutation"),
+    # Unqualified `.rename(`/`.replace(` are deliberately absent: `str.replace` is string
+    # handling, and a predicate that flags it would be turned off within a week. The
+    # runtime tree-hash test covers what this leaves out.
+    (re.compile(r"\.(unlink|touch|mkdir|rmdir)\("), "Path mutation"),
+    (re.compile(r"\b(mkstemp|mkdtemp|NamedTemporaryFile)\b"), "temporary file creation"),
+)
+
+
+def write_violations(text: str) -> list[tuple[int, str]]:
+    found = []
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        for pattern, label in WRITE_PATTERNS:
+            if pattern.search(line):
+                found.append((lineno, label))
+    return found
+
+
+def bundled_scripts() -> list:
+    scripts = REPO / "skill" / "scripts"
+    return sorted(scripts.glob("*.py")) if scripts.is_dir() else []
+
+
+def test_bundled_scripts_exist():
+    assert bundled_scripts(), "no bundled scripts found to check"
+
+
+def test_no_bundled_script_has_a_write_path():
+    """The script verifies; the agent writes. There is no --fix, on purpose."""
+    for path in bundled_scripts():
+        found = write_violations(path.read_text(encoding="utf-8"))
+        assert not found, "\n".join(
+            f"{path.relative_to(REPO)}:{line}: {label}" for line, label in found
+        )
+
+
+def test_the_write_path_check_has_a_positive_control():
+    control = 'p = Path("/tmp/x")\np.write_text("hi")\nopen("/tmp/y", "w").write("z")\np.unlink()\n'
+    labels = {label for _, label in write_violations(control)}
+    assert len(labels) >= 3, labels
+
+
+def test_the_write_path_check_has_a_negative_control():
+    """Reading, printing and string manipulation must not trip it."""
+    control = (
+        "text = path.read_text()\n"
+        'sys.stdout.write("ok\\n")\n'
+        "print(json.dumps(data))\n"
+        "cleaned = text.replace('a', 'b')\n"
+        "root.mkdir  # bound, not called\n"
+        "os.path.join(root, name)\n"
+    )
+    assert write_violations(control) == []
+
+
 def test_no_fixture_is_named_skill_md():
     """Hermes walks the skills tree recursively; a fixture SKILL.md would register."""
     if not FIXTURES.exists():

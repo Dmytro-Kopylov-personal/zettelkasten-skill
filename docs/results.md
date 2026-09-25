@@ -2,6 +2,45 @@
 
 Measurements, appended as phases complete. A phase's gate is met here or it is not met.
 
+## P2 — Linter core (2026-09-26)
+
+**The parser matches PyYAML on the whole corpus.** 26 documents parse to exactly the same
+values as `yaml.safe_load`, including types: `id: 202609261430` is an int, `created:
+2026-09-26` is a `datetime.date`, `archived: no` is `False`, `count: 1_000` is `1000`, and
+a quoted number stays a string. Seven more are deliberately rejected where PyYAML accepts
+them (nested mappings, block scalars, anchors, aliases, flow mappings, duplicate keys) —
+each asserted to be something PyYAML really does accept, so "stricter" cannot quietly
+become "broken anyway". Eight malformed documents are rejected by both, and all fifteen
+rejected constructs are pinned to the exact line they report.
+
+**The oracle was mutation-tested, because 45 green tests on the first run are a reason to
+distrust the oracle, not to trust the parser.** Three independent mutations — removing
+implicit typing, disabling unquoting, allowing duplicate keys — each produce disagreement
+on the corpus, so the agreement above is real.
+
+**Extraction.** All four false-positive traps return no links: `[[500, 375]]` inside a
+fence, `[[wikilinks]]` in inline code, `[[1](url)]`, and a tilde fence. Line numbers are
+preserved through code-stripping, and are **file** lines, not body lines.
+
+**Digest.** `hash` is stable across calls, identical for two files whose bodies match but
+whose frontmatter differs (so recording the digest inside the frontmatter cannot change
+it), different for CRLF-vs-LF bodies, and equal to the whole file when there is no
+frontmatter. A mid-document `---` horizontal rule is not mistaken for a closing fence.
+CLI digest == library digest, exit 0/2 correct, run under `python3 -I` to prove no
+third-party imports.
+
+**Suite:** 186 passed, 1 skipped (the fixtures sweep, which has nothing to sweep yet).
+
+**Two defects the tests found:**
+
+1. Extraction returned *body*-relative line numbers, so a finding would have sent the
+   reader to the wrong line of the file. Fixed with `split_with_lines`, which resolves
+   both offsets once; the model now promises file lines.
+2. The write-path invariant's `\.(rename|replace)\(` predicate fired on `str.replace` in
+   the linter itself — a false positive that would have got the check disabled. The
+   unqualified alternates were dropped (the tree-hash test covers what that leaves out),
+   and the predicate gained both controls.
+
 ## P1 — Render (2026-09-26)
 
 **Renders.** All three validate clean under the local rules and under the independent
