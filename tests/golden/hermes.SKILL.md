@@ -9,7 +9,6 @@ metadata:
   hermes:
     tags: [zettelkasten, notes, knowledge-management, atomic-notes, research, markdown]
     category: research
-    related_skills: [obsidian, llm-wiki, start-investigation]
 ---
 
 # Zettelkasten Vault Maintainer

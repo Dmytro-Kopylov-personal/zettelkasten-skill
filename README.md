@@ -7,6 +7,9 @@ One capability, three platforms — Hermes, Claude Code, and GitHub Copilot — 
 shared body plus a thin per-platform seam, so the same skill behaves the same way wherever it
 runs.
 
+**New here? → [Getting started](GETTING-STARTED.md)** — install, your first vault, a worked ingest
+with real output, and what a good note looks like.
+
 ## What it does
 
 | Operation | Contract |
@@ -175,6 +178,22 @@ ablation's aggregate is misleading read alone: both cases score 1.00 with the sk
 threshold without, but each delta rests on a single grader that tests a *naming convention*,
 so it demonstrates less than "the skill works" (V8, `docs/design.md`). Every run in it
 executed as `deepseek-flash`, not Claude.
+
+## A note for contributors
+
+**`.githooks/commit-msg` rejects any `Co-authored-by:` trailer.** It is tracked in the repo but
+not active by default, because `core.hooksPath` is local configuration rather than something a
+clone inherits. Turn it on if you want your commits checked before they land:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+**Adding a check means adding a way for it to fail.** Every instrument here carries a control
+in the opposite direction, so a check that flags everything and one that flags nothing cannot
+both pass — `docs/design.md` says why, at length, and `docs/results.md` records what each
+control caught. That is the standard this repo holds itself to, and it is the most useful thing
+to read before changing `zettel_lint.py`.
 
 ## Licence
 
