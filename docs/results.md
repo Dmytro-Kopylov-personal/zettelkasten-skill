@@ -2,6 +2,43 @@
 
 Measurements, appended as phases complete. A phase's gate is met here or it is not met.
 
+## The environment pin (2026-09-26)
+
+The question was whether one vault can be made reachable from all three harnesses without touching
+the skill. `ZETTELKASTEN_VAULT_PATH` is the skill's second resolution step and was documented
+nowhere in the repo, so the work was to set it, run each harness, and write down what happened.
+
+**`~/.zshrc` does not reach most callers.** The export was written there first and probed from four
+directions: `zsh -i -c 'printenv ZETTELKASTEN_VAULT_PATH'` printed the path while plain
+`zsh -c '...'` printed nothing. `.zshrc` is read only by *interactive* shells, so anything a script,
+a task runner, a desktop application or another agent's shell tool spawns never sees it — which is
+most of the callers this variable exists to pin down. Moved to `~/.zshenv`, which every zsh reads:
+interactive, non-interactive, and a non-interactive zsh spawning a child now all print the path. The
+README documents it there. The linter resolves the vault from the variable alone from an unrelated
+working directory, and still exits 2 when the variable names something that is not a vault, so a
+stale value cannot cause a write.
+
+**The contract suite was passing on the ambient environment.** With the variable set, `make test`
+failed: `test_the_vault_may_come_from_the_environment` asserted that no vault and no environment
+variable is a usage error, but `run()` passed no `env=`, so every child inherited whatever shell
+started pytest. The test was not measuring the linter; it was measuring the absence of a vault in
+the environment, and it would have failed on any machine that had followed the README's own advice
+to set the variable. `run()` now scrubs it, and the pair is complete: the variable alone selects the
+vault (`vault_defects`, 27 notes, 31 findings, distinguishable from `vault_clean`'s 8), and with
+neither a path nor the variable the exit is 2. Neither direction alone tests the mechanism — the
+first would pass against a variable nothing reads, the second against a linter that ignores it.
+
+**One harness cannot read it, and the reason is structural.** A Claude Code run in `-p` mode spent
+fifteen turns trying to `printenv` the variable and never got a value: the shell call needs an
+approval and a headless run has nobody to give one. The agent then reported step 4 (ask) and named
+the three steps that had failed, which is the skill behaving correctly with a tool it does not
+have — but it is not a pin. An interactive session prompts instead, so the ordinary path works.
+Claude Code's settings file takes an `env` block that would put the variable in the process
+regardless of how it was launched, including the desktop and VS Code surfaces the README lists as
+unverified; that was **not tested**, so it is recorded here as a candidate rather than a remedy.
+Copilot and Hermes both name the skill in their own listings (`copilot skill list`, `hermes skills
+list`), and both are launched from a shell, so both inherit the pin.
+
 ## The release pass (2026-09-26)
 
 The question was whether the repo was clean enough to publish, and the honest answer was no: the

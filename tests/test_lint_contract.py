@@ -14,12 +14,18 @@ Nothing here writes outside `tmp_path`, and one test proves it: the fixtures are
 before and after a full sweep and must be byte-identical. A fixture is an input; a linter
 that edits its inputs is not a verifier. That test carries its own control, because a tree
 hash that always returns the same string would make it pass forever.
+
+Every subprocess is also handed an environment with `ZETTELKASTEN_VAULT_PATH` removed, so a
+machine with the variable exported resolves the same as one without it. That was not true
+until the variable was set, and it was the absence of a vault in the environment, not the
+linter, that the "no vault" test was passing on.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 import sys
 
@@ -44,12 +50,28 @@ FIXTURE_NAMES = [
 ]
 
 
+VAULT_PIN = "ZETTELKASTEN_VAULT_PATH"
+
+
+def environment_without_the_pin() -> dict:
+    """The ambient environment, minus the vault pin.
+
+    Every subprocess here gets this, so the suite resolves the same way on a machine that has
+    `ZETTELKASTEN_VAULT_PATH` exported as on one that does not. It did not, until the variable
+    was actually set: `test_the_vault_may_come_from_the_environment` passed only because nothing
+    in the environment named a vault, and failed the moment the README's own advice was followed.
+    A test whose result depends on the shell that started it is not measuring the linter.
+    """
+    return {key: value for key, value in os.environ.items() if key != VAULT_PIN}
+
+
 def run(*args: str, expect_ok: bool = True) -> subprocess.CompletedProcess:
     result = subprocess.run(
         [sys.executable, "-I", str(LINTER), *args],
         capture_output=True,
         text=True,
         cwd=str(REPO),
+        env=environment_without_the_pin(),
     )
     if expect_ok and result.returncode not in (0, 1, 2):
         raise AssertionError(f"unexpected exit {result.returncode}: {result.stderr}")
@@ -225,14 +247,30 @@ def test_the_text_summary_says_what_exit_2_means():
 
 
 def test_the_vault_may_come_from_the_environment():
+    """The variable alone, with no path in the arguments, names the vault. This is the direction
+    the README tells a human to rely on, so it is asserted rather than assumed; its pair below
+    keeps a variable that nothing ever reads from passing it."""
+    environment = dict(environment_without_the_pin(), **{VAULT_PIN: str(FIXTURES / "vault_clean")})
+    result = subprocess.run(
+        [sys.executable, "-I", str(LINTER), "--json", "--now", NOW],
+        capture_output=True,
+        text=True,
+        env=environment,
+        cwd=str(REPO),
+    )
+    assert result.returncode == 0, result.stderr
+    document = json.loads(result.stdout)
+    assert document["vault"] == str(FIXTURES / "vault_clean")
+    assert document["summary"]["metrics"]["notes"] == 8
+
+
+def test_with_neither_a_path_nor_the_variable_it_is_a_usage_error():
     result = run("--json", "--now", NOW, expect_ok=False)
     assert result.returncode == 2, "no vault and no environment variable is a usage error"
 
 
 def test_an_explicit_path_outranks_the_environment():
-    import os
-
-    environment = dict(os.environ, ZETTELKASTEN_VAULT_PATH=str(FIXTURES / "vault_defects"))
+    environment = dict(environment_without_the_pin(), **{VAULT_PIN: str(FIXTURES / "vault_defects")})
     result = subprocess.run(
         [sys.executable, "-I", str(LINTER), str(FIXTURES / "vault_clean"), "--json", "--now", NOW],
         capture_output=True,

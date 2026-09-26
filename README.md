@@ -122,6 +122,36 @@ No virtualenv, no `pip install`, no third-party imports. The `-I` is not decorat
 `PYTHONPATH` and the user site directory, so a script that had grown a dependency would fail here
 rather than on a machine that happens to have it.
 
+### Pinning the vault
+
+A machine can hold more than one vault, so the skill resolves which one to work in by a fixed order.
+It is in the shared body, so it is the same on all three platforms:
+
+1. A path you gave in the request.
+2. `ZETTELKASTEN_VAULT_PATH`.
+3. A walk upward from the working directory for a directory holding all three of `SCHEMA.md`,
+   `permanent/` and `log.md`.
+4. Asking you. It never guesses, and never writes against a vault it has not confirmed.
+
+Two vaults under one parent is enough to make step 3 ambiguous: the search finds both, and nothing
+in it says which one you meant. Setting the variable removes the search entirely.
+
+```sh
+export ZETTELKASTEN_VAULT_PATH="$HOME/notes/zettelkasten"
+```
+
+Put that in `~/.zshenv` rather than `~/.zshrc`. `.zshrc` is read only by *interactive* shells, so an
+export there is invisible to anything a script, a task runner, a desktop application or another
+agent's shell tool spawns — which is most of the callers this variable exists to pin down.
+`.zshenv` is read by every zsh, interactive or not.
+
+Two limits worth knowing. A shell that reads no zsh startup file at all — a bash-only environment,
+or a desktop application whose environment comes from the session rather than a shell — still misses
+the export, and falls through to the walk-up and then to asking. That direction is safe, but it is
+not a pin. And the variable has to be *read*: an agent with no way to run a command cannot see it
+either, so it too falls through to step 3. For that case, `references/tool-free-fallback.md` covers
+running without a shell at all.
+
 ---
 
 ## Your first vault
