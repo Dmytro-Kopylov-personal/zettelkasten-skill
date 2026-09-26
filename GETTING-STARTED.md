@@ -25,14 +25,20 @@ cd zettelkasten-skill
 Then pick your platform:
 
 ```bash
-./install.sh --platform claude     # ~/.claude/skills/zettelkasten/
-./install.sh --platform copilot    # ~/.copilot/skills/zettelkasten/   (add --force to create the root)
-./install.sh --platform hermes     # ~/.hermes/skills/research/zettelkasten/
+./install.sh --platform claude --force     # ~/.claude/skills/zettelkasten/
+./install.sh --platform copilot --force    # ~/.copilot/skills/zettelkasten/
+./install.sh --platform hermes --force     # ~/.hermes/skills/research/zettelkasten/
 ```
 
+**`--force` is required the first time**, because the platform's skills directory usually does not
+exist until the agent has run at least once, and the installer refuses to invent one — a missing
+root may mean the platform is not installed at all. With `--force` it creates that one directory
+and nothing else. It never overwrites a file the installer did not write; the remedy there is for
+you to move the file, not to re-run with a flag.
+
 Leave `--platform` off and it detects what you have. Add `--dry-run` to see what it would do
-without writing anything. Re-running is a no-op; a file the installer did not write is *refused*
-rather than overwritten, and a file it did write is backed up first.
+without writing anything. Re-running is a no-op, and a file it *did* write is backed up to
+`.bak.<timestamp>` before being replaced.
 
 **Copilot users:** do not use `copilot skill add <url>`. It fetches a single `SKILL.md` and nothing
 else, which installs a skill whose `references/` and `scripts/` are missing. Point it at the cloned
