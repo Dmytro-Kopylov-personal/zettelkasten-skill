@@ -12,7 +12,7 @@ right and this file is a default. Read it before the first write of a session.
 ```text
 SCHEMA.md                 what this vault is about, its tags, its thresholds
 log.md                    one line per operation, oldest first
-permanent/                the notes: atomic, linked, sourced
+permanent/                the notes: atomic, linked, sourced — may be filed in subdirectories
 raw/articles/             captured sources, immutable
 raw/papers/
 raw/notes/
@@ -24,6 +24,14 @@ inbox/                    captures that are not notes yet
 
 A folder without `permanent/`, `SCHEMA.md` and `log.md` is not a vault. Say so and offer to
 initialise it rather than writing into it.
+
+`permanent/` may be filed into subdirectories, and every check walks the whole tree, so a
+vault filed by topic or by year reads the same as a flat one. A link resolves by name alone:
+`[[202609251200-slug]]` finds its note wherever it sits, and so do `[[memory/202609251200-slug]]`
+and the same with `.md` appended. The other directories are read **flat** — `structure/`'s
+files have fixed names and fixed roles, so a nested `index.md` is a sub-list rather than the
+index, and a vault that has no `structure/index.md` is told so instead of being silently
+indexed by the wrong file.
 
 ## The atomicity test
 

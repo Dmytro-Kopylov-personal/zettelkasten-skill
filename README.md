@@ -143,10 +143,36 @@ No virtualenv, no `pip install`, no third-party imports: `render.py` and the bun
 linter are stdlib-only single files, so they run wherever a Python 3 exists. The test
 suite is the only part that wants `uv`, and it uses it to fetch its own dependencies.
 
+## Obsidian
+
+A vault is plain Markdown — `.md` files, YAML frontmatter, `[[wikilinks]]` — so **open the
+folder as an Obsidian vault and it works.** Obsidian's out-of-the-box settings are the ones
+this skill writes: wikilinks rather than Markdown links, and the shortest link format, which
+is exactly `[[202609251200-slug]]`. Notes may be filed into subdirectories of `permanent/`,
+and a link resolves by name alone, so it finds its note wherever it sits. Callouts,
+`%%comments%%`, dataview fences, `^block-id` references, `![[embeds]]` and the `.obsidian/`
+directory are all handled — embeds are link-checked like any other link, and code fences are
+stripped before links are read, which is the same rule Obsidian applies.
+
+Three things to know rather than discover:
+
+- **`^[raw/articles/x.md]` renders as an inline footnote.** Obsidian's lexer reads `^[` as
+  the start of one, unconditionally — no setting turns it off. In reading view a provenance
+  marker becomes a superscript and the cited paths collect in the footnote block. Nothing
+  breaks: the file is untouched and the linter reads the file, not the render. It is arguably
+  a good rendering of provenance. The syntax is load-bearing, so it stays.
+- **`links:` has no Properties-panel editor.** Obsidian's property types are text, number,
+  checkbox, date, datetime, list and tags; there is no list of objects, so the panel shows
+  this one as raw YAML. The data is intact and every check reads it — it simply cannot be
+  edited from the panel.
+- **Quote the `id`.** Unquoted, `id: 202609261430` infers as `Number` and the panel offers to
+  edit it as one. `id: "202609261430"` is `Text`. Both parse and lint identically; the
+  skeleton and the format reference use the quoted form.
+
 ## Why it is built this way
 
-Nine findings came from running the platforms' own code rather than trusting the spec — one of
-them a correction to a claim this repo had already published. `docs/design.md` carries all nine;
+Ten findings came from running the platforms' own code rather than trusting the spec — one of
+them a correction to a claim this repo had already published. `docs/design.md` carries all ten;
 these are the ones that shape daily use:
 
 - **`platforms:` in Hermes is an OS gate, not an agent gate.** `platforms: [copilot, hermes]`
@@ -175,6 +201,14 @@ these are the ones that shape daily use:
   degraded parser hides every one of them and the remedy is upstream. It changed the tests
   instead: one asserts the shipped render parses under the installed parser to a real list,
   and a control forces the fallback and asserts it really does hide the skill.
+- **A note one directory deep was invisible.** `permanent/` was scanned with a flat
+  `glob("*.md")` while `raw/` and `inbox/` used `rglob`, so a note filed in a subdirectory
+  was not collected — and the run then reported *0 notes, no findings*, exit 0, which reads
+  exactly like a clean vault. That is the failure this whole repository is built to catch,
+  and it was in the repository. `permanent/` now walks the tree; links resolve by note rather
+  than by string, so `[[note]]`, `[[sub/note]]` and `[[note.md]]` all credit the same note
+  and cannot produce a phantom orphan. `structure/` stays flat on purpose — its files have
+  fixed names and roles, so a nested `index.md` is a sub-list, not the index.
 
 The same reasoning drives the linter: it is verified against hand-labelled fixtures whose
 `MANIFEST.md` is written before the code runs, and a check that cannot run says so in
@@ -185,7 +219,7 @@ requiring exactly that check's findings to disappear.
 
 ## Status
 
-The render layer, the linter and the installer are complete and green (**523 tests**), and the
+The render layer, the linter and the installer are complete and green (**534 tests**), and the
 skill is installed and discovered on all three platforms:
 
 | Platform | Installed to | Discovery verified by | Ingest acceptance |

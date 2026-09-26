@@ -8,6 +8,7 @@ and why the shared-body invariant below reads from it rather than from the templ
 from __future__ import annotations
 
 import json
+import re
 
 import pytest
 from conftest import GOLDEN, REPO, strip_seams
@@ -281,6 +282,35 @@ def test_the_marketplace_entry_resolves_to_the_plugin_root():
     assert source.startswith("./"), f"{source!r} is not ./-relative"
     assert (REPO / source).resolve() == REPO, "the entry does not point at this plugin"
     assert (REPO / source / ".claude-plugin" / "plugin.json").is_file()
+
+
+def test_the_version_is_declared_once_and_repeated_only_where_it_must_be():
+    """Three hand-maintained strings, one release.
+
+    The plugin manifest and the two platform frontmatter fragments each carry the skill's
+    version, and nothing else ties them together — so a bump that updates two of them ships
+    a Hermes frontmatter disagreeing with the plugin it came from, silently, because no
+    consumer reads both.
+
+    Read with a line pattern rather than a parser: Claude's frontmatter nests the key under
+    `metadata`, and the linter's parser rejects nested mappings by design because it reads
+    *notes* rather than skill frontmatter. Each pattern is asserted to match, so a
+    reformatting fails here instead of matching nothing and comparing equal to nothing.
+    """
+    claude = (REPO / "src" / "fragments" / "frontmatter.claude.yaml").read_text(encoding="utf-8")
+    hermes = (REPO / "src" / "fragments" / "frontmatter.hermes.yaml").read_text(encoding="utf-8")
+
+    found = {}
+    for name, text, pattern in (
+        ("claude", claude, re.compile(r"^  version:[ \t]*(\S+)$", flags=re.MULTILINE)),
+        ("hermes", hermes, re.compile(r"^version:[ \t]*(\S+)$", flags=re.MULTILINE)),
+    ):
+        match = pattern.search(text)
+        assert match, f"the {name} fragment declares no version"
+        found[name] = match.group(1).strip("'\"")
+
+    plugin = plugin_manifest()["version"]
+    assert set(found.values()) == {plugin}, f"{found} disagrees with plugin.json at {plugin}"
 
 
 def test_the_marketplace_entry_does_not_silently_disagree_about_the_version():

@@ -37,6 +37,7 @@ NOW = dt.date(2026, 9, 28)
 
 FIXTURE_NAMES = [
     "vault_clean",
+    "vault_nested",
     "vault_defects",
     "vault_minimal",
     "vault_trap",

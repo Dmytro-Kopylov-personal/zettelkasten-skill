@@ -1,7 +1,7 @@
 ---
 name: zettelkasten
 description: 'Ingest, query, lint and init a Zettelkasten vault. Use when the user drops a source, asks a question of their notes, or says lint, audit or health-check.'
-version: 1.0.0
+version: 1.0.1
 author: Dmytro Kopylov
 license: MIT
 platforms: [linux, macos, windows]
@@ -114,7 +114,7 @@ Full contract in `references/note-format.md`; the skeleton is:
 
 ```markdown
 ---
-id: 202609261430
+id: "202609261430"
 title: Attention budget is a scarce resource
 type: permanent
 status: seed
@@ -140,7 +140,15 @@ Elaboration, evidence, counterarguments. Cite as you go, not at the end. ^[raw/a
 ```
 
 `status` moves `draft` → `seed` → `evergreen`; `archived` retires a note without deleting it.
-`confidence` is `high` only when several sources agree.
+`confidence` is `high` only when several sources agree. `id` is **quoted**: it is twelve
+digits, so an editor that infers a type from the text will call it a number and offer to
+edit it as one. Both spellings parse and lint the same — quote it so the value is what it
+looks like.
+
+New notes go at the top level of `permanent/`. A vault that files its notes in subdirectories
+is read correctly, because every check walks the whole tree, so search `permanent/`
+recursively and leave an existing filing alone; only write into a subdirectory when the
+vault's `SCHEMA.md` asks for it.
 
 ## Init
 

@@ -596,6 +596,7 @@ class Vault:
     raw: list[RawFile] = field(default_factory=list)
     structure: dict[str, str] = field(default_factory=dict)
     missing: list[str] = field(default_factory=list)
+    _link_index: dict[str, Note] | None = field(default=None, repr=False)
 
     @property
     def notes_by_id(self) -> dict[str, Note]:
@@ -609,6 +610,38 @@ class Vault:
     def note_slugs(self) -> set[str]:
         return {note.slug for note in self.notes}
 
+    def link_index(self) -> dict[str, Note]:
+        """Every spelling Obsidian would resolve to a note here, built once on first use.
+
+        Obsidian writes the shortest unambiguous link and lengthens it only when two notes
+        share a basename, so all of these occur in a real vault: `note`, `note.md`,
+        `sub/note`, and the vault-relative `permanent/sub/note`. A note's twelve-digit
+        filename is what stops two notes from sharing one, and ZK006/ZK007 check that.
+        """
+        if self._link_index is None:
+            index: dict[str, Note] = {}
+            for note in self.notes:
+                rel = note.relpath[:-3] if note.relpath.endswith(".md") else note.relpath
+                within = rel.split("/", 1)[1] if "/" in rel else rel
+                for form in (note.slug, rel, within):
+                    index.setdefault(form, note)
+                    index.setdefault(f"{form}.md", note)
+                if note.id:
+                    index.setdefault(note.id, note)
+            self._link_index = index
+        return self._link_index
+
+    def resolve(self, target: str) -> Note | None:
+        """The note Obsidian would open for this link, or None if it opens nothing.
+
+        Resolution is by the note, not by the string, so a link written in any of the
+        accepted spellings credits the same note — which is what keeps the inbound count
+        (ZK011) and the orphan rate in the metrics from disagreeing with ZK008.
+        """
+        if not target:
+            return None
+        return self.link_index().get(target)
+
 
 REQUIRED_VAULT_PATHS = ("permanent", "SCHEMA.md", "log.md")
 
@@ -619,7 +652,7 @@ def load_vault(root: Path) -> Vault:
 
     permanent = root / "permanent"
     if permanent.is_dir():
-        for path in sorted(permanent.glob("*.md")):
+        for path in sorted(permanent.rglob("*.md")):
             vault.notes.append(_load_note(path, root))
 
     raw_root = root / "raw"
@@ -640,6 +673,13 @@ def load_vault(root: Path) -> Vault:
 
     structure = root / "structure"
     if structure.is_dir():
+        # Deliberately flat, while permanent/ and raw/ recurse. structure/ holds named
+        # registries — index.md, SCHEMA.md, overview.md, concept-table.md — whose roles are
+        # fixed by the layout, so nesting has no meaning to give a file. Recursing here
+        # would buy nothing and cost something: a nested index.md would become a candidate
+        # for *the* index, and the vault would be indexed by a file the user meant as a
+        # sub-list. A missing structure/index.md is reported as not-applicable, which is
+        # visible, so a vault that nests its index is told rather than silently misread.
         for path in sorted(structure.glob("*.md")):
             vault.structure[path.name] = path.read_text(encoding="utf-8", errors="replace")
 
@@ -1072,11 +1112,7 @@ def check_duplicate_id(vault: Vault, config: dict, now: dt.date) -> list[Finding
 
 
 def _resolve(vault: Vault, target: str) -> bool:
-    if target in vault.note_slugs or target in vault.notes_by_id:
-        return True
-    if target.endswith(".md") and Path(target).stem in vault.note_slugs:
-        return True
-    return False
+    return vault.resolve(target) is not None
 
 
 def check_broken_links(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
@@ -1164,21 +1200,34 @@ def check_outbound_links(vault: Vault, config: dict, now: dt.date) -> list[Findi
     return findings
 
 
-def check_orphans(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
-    """ZK011. Links from structure/ are excluded, or index.md would cure every orphan."""
-    inbound: dict[str, int] = {}
+def inbound_counts(vault: Vault) -> dict[str, int]:
+    """Inbound links per note, keyed by relpath.
+
+    Links from `structure/` are excluded, or `index.md` would cure every orphan and ZK011
+    would be provably vacuous. The count keys on the note a link *resolves to* rather than
+    on the string that was written, so the four spellings of one target are one link. Both
+    ZK011 and the metrics use this, so the finding and the number cannot disagree.
+    """
+    counts: dict[str, int] = {}
     for note in vault.notes:
         targets = [target for target, _ in _link_entries(note) if target]
         targets += [target for target, _ in note.links]
         for target in targets:
-            if target == note.slug or target == note.id:
+            other = vault.resolve(target)
+            if other is None or other is note:
                 continue
-            inbound[target] = inbound.get(target, 0) + 1
+            counts[other.relpath] = counts.get(other.relpath, 0) + 1
+    return counts
+
+
+def check_orphans(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
+    """ZK011. A note nothing links to is invisible, however good it is."""
+    inbound = inbound_counts(vault)
     findings = []
     for note in vault.notes:
         if note.frontmatter is None or note.slug in ("index",):
             continue
-        if inbound.get(note.slug, 0) + inbound.get(note.id or "", 0) == 0:
+        if inbound.get(note.relpath, 0) == 0:
             findings.append(
                 Finding(
                     code="ZK011",
@@ -1410,7 +1459,8 @@ def check_duplicate_links(vault: Vault, config: dict, now: dt.date) -> list[Find
         for target, verb in _link_entries(note):
             if not target:
                 continue
-            if target in (note.slug, note.id):
+            other = vault.resolve(target)
+            if other is note:
                 findings.append(
                     Finding(
                         code="ZK020",
@@ -1423,7 +1473,10 @@ def check_duplicate_links(vault: Vault, config: dict, now: dt.date) -> list[Find
                     )
                 )
                 continue
-            if target in seen:
+            # Keyed on the note, not the string: one note linked as both `202609251200-x`
+            # and `memory/202609251200-x` is still the same target named twice.
+            key = other.relpath if other is not None else target
+            if key in seen:
                 findings.append(
                     Finding(
                         code="ZK020",
@@ -1435,7 +1488,7 @@ def check_duplicate_links(vault: Vault, config: dict, now: dt.date) -> list[Find
                         action="keep one link, with the verb that fits best",
                     )
                 )
-            seen.add(target)
+            seen.add(key)
     return findings
 
 
@@ -1898,16 +1951,11 @@ def collect_metrics(vault: Vault) -> dict:
             if verb:
                 verbs[verb] = verbs.get(verb, 0) + 1
                 links += 1
+    inbound = inbound_counts(vault)
     orphans = sum(
         1
         for note in vault.notes
-        if note.frontmatter is not None
-        and not any(
-            note.slug in [target for target, _ in _link_entries(other)]
-            or note.slug in [target for target, _ in other.links]
-            for other in vault.notes
-            if other is not note
-        )
+        if note.frontmatter is not None and inbound.get(note.relpath, 0) == 0
     )
     return {
         "notes": len(vault.notes),

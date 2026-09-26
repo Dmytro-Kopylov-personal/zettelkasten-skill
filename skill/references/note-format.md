@@ -16,11 +16,26 @@ The `id` field must equal those twelve digits. A file whose name and `id` disagr
 reported as `ZK006`, and the disagreement is worse than either half being wrong: links
 resolve by filename, so the frontmatter and the graph would be telling different stories.
 
+**Quote the `id`** — `id: "202609261430"`, not `id: 202609261430`. Twelve digits is a
+number to anything that infers a type from the text, and an editor that decides so will
+show it as one and let it be edited as one. Obsidian's Properties panel is the one you will
+meet: unquoted, the field is typed `Number` and has no text affordances; quoted, it is
+`Text`. Both spellings parse and lint identically — the linter reads either — so this is
+about the value being what it looks like, and identifiers are not quantities.
+
+Notes may sit in subdirectories of `permanent/`, and every check walks the whole tree, so a
+vault filed by topic or by year is read the same as a flat one. Links need not say which:
+`[[202609251200-slug]]`, `[[memory/202609251200-slug]]` and `[[permanent/memory/202609251200-slug]]`
+all resolve to the same note, as does any of them with `.md` appended — Obsidian writes the
+shortest form by default and lengthens it only when two notes share a basename, which the
+timestamp prefix prevents. Only `structure/` is read flat, because its files have fixed
+names and fixed roles.
+
 ## Frontmatter
 
 ```yaml
 ---
-id: 202609261430
+id: "202609261430"
 title: Attention budget is a scarce resource
 type: permanent
 status: seed

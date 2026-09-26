@@ -2,6 +2,58 @@
 
 Measurements, appended as phases complete. A phase's gate is met here or it is not met.
 
+## After v1.0.0 — the Obsidian pass (2026-09-26)
+
+The question was whether the approach could be made Obsidian-compatible, and the answer was
+measured rather than argued: read Obsidian's own `app.asar`, and linted the live vault.
+
+**What needed no work.** A vault is `.md` + YAML frontmatter + `[[wikilinks]]`, which is what
+the skill writes. The live vault's `.obsidian/app.json` is `{}` — every default — so
+`useMarkdownLinks: false` and `newLinkFormat: shortest`, the two settings that decide how
+links are written, already agree with the skill's output. Callouts, `%%comments%%`, dataview
+fences, `^block-id`, `![[embeds]]` and `.obsidian/` all survive a lint run, and embeds are
+link-checked correctly. A basename-collision sweep over the live vault found `index.md`,
+`SCHEMA.md`, `log.md`, `overview.md` and `concept-table.md` occurring exactly once each, so
+every `[[short]]` link in it is unambiguous.
+
+**The bug.** `permanent.glob("*.md")` and `structure.glob("*.md")` are flat while
+`raw_root.rglob` and `inbox.rglob` are recursive. A note at `permanent/topic/note.md` was not
+collected, `summary.notes` read 0, and the run exited **0** with no findings. Obsidian users
+file notes into subdirectories routinely, so this was reachable by ordinary use, and its
+output — "0 notes, no findings" — is indistinguishable from a clean vault. `permanent/` now
+recurses. `structure/` was recursed, then deliberately un-recursed: see below.
+
+**Link resolution went from string to note.** `_resolve` compared the target against slug and
+id literally, which meant a link Obsidian writes when `newLinkFormat` is not `shortest` —
+`[[permanent/memory/202609251200-x]]` — would have been a false `ZK008`, and, worse, would
+have earned the note nothing in the inbound count, producing a false `ZK011` orphan and
+inflating the reported orphan rate. Resolution is now `Vault.resolve()`, one index built once,
+accepting `note`, `note.md`, `sub/note` and `permanent/sub/note`, returning the Note rather
+than a boolean. `inbound_counts()` is shared by the check and the metric, so the finding and
+the number cannot disagree.
+
+**The mutation that did not fail, and what it changed.** The first version of `vault_nested`
+also recursed into `structure/` and keyed the result by relative path, so that a nested
+`structure/topics/index.md` could not take over as the vault index. Reverting that `rglob` to
+`glob` left all 534 tests green: `structure/index.md` is a top-level file, so recursion adds
+only files nothing reads, and the one thing it bought was the clobber hazard the relative
+keying existed to prevent. The rule that came out of it is stated where the layout is defined
+— a directory whose files are referenced by path (`raw/`) or that accumulates user content
+(`permanent/`) recurses; one holding fixed named registries (`structure/`) does not, and a
+missing `structure/index.md` is reported as *not applicable*, which is visible.
+
+**Then a mutation found an untested branch.** `Vault.link_index` accepts the `.md` suffix, and
+deleting that line left the suite green — the branch was exercised by no fixture in the old
+code or the new. The fixture now writes three spellings of the same target in three notes, so
+each form has a mutation that kills it. A form Obsidian accepts whose branch is unexercised is
+indistinguishable from a form that is not handled at all.
+
+Measured after the change: `vault_nested` — a clean vault with its notes one and two
+directories deep — reports 4 notes, 8 links, orphan rate 0.0, zero findings, exit 0. Four
+mutations fail against it (flat `permanent/`, the long form dropped, the `.md` form dropped,
+inbound counting by string), and the flat suite is unchanged at **534 tests, 11.6s**. The live
+vault lints clean either way, because it has no notes yet.
+
 ## P7 — Copilot acceptance (2026-09-26)
 
 **Installed and discovered.** `./install.sh --platform copilot --force` wrote 11 files into

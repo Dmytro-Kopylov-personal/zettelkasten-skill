@@ -1,0 +1,7 @@
+{
+  "_comment": "A clean vault whose notes live one directory deep. No findings at any severity, so the exit code is 0 at every --fail-on threshold. The four not-applicable checks are named rather than omitted; a check that could not run is not the same as a check that passed.",
+  "exit": {"error": 0, "warn": 0, "info": 0},
+  "metrics": {"notes": 4, "raw_sources": 1, "links": 8, "orphan_rate": 0.0},
+  "not_applicable": ["ZK024", "ZK027", "ZK029", "ZK031"],
+  "findings": []
+}
