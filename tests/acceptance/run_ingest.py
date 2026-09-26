@@ -334,7 +334,7 @@ def one_run(number: int, *, timeout: int) -> dict:
     root = Path(f"/tmp/zettel-acceptance-{number}")
     if root.exists():
         shutil.rmtree(root)
-    vault = root / "vault"
+    vault = root / "zettelkasten"  # Init step 1: the vault gets its own folder, not the cwd.
     init_vault(vault, domain="how memory and learning actually work, evidence first")
 
     source = root / "spacing-and-forgetting.md"

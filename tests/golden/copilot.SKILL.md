@@ -66,6 +66,12 @@ Stop at the first step that resolves:
 If any of `permanent/`, `SCHEMA.md` or `log.md` is missing, the folder is not a vault. Say so and
 offer to initialise it rather than writing into it.
 
+The folder holding those three is the **vault root**, and it is the boundary of every write you
+make: captures, notes, structure files and the log all live inside it. Nothing above it is yours
+to touch, however related the files there look, and nothing outside it is part of the vault. When
+a vault does not yet exist, it gets its own folder rather than taking over the one you are
+standing in.
+
 ## Orient before you act
 
 Every session, before the first write: read `SCHEMA.md`, read `structure/index.md`, read the last
@@ -128,7 +134,11 @@ Elaboration, evidence, counterarguments. Cite as you go, not at the end. ^[raw/a
 
 Only when the folder is not already a vault, and only after asking where it lives.
 
-1. Confirm the vault path and whether the folder is empty.
+1. Give the vault **its own folder** — `zettelkasten/` under the directory you were pointed at,
+   unless the user names another path — and confirm it before writing. A vault that shares a
+   directory with anything else puts that whole directory inside its blast radius, and the vault
+   root is the only place this skill writes. The folder must be empty, or hold nothing but a
+   vault.
 2. Create `raw/articles`, `raw/papers`, `raw/notes`, `permanent`, `structure`, `inbox`.
 3. Materialise the scaffold, one template per file: `SCHEMA.md` from `templates/SCHEMA.md`,
    `structure/index.md` from `templates/index.md`, `structure/concept-table.md` from
@@ -223,6 +233,10 @@ findings as a hundred problems.
     independent evidence for each other, and that is exactly what `supports` claims. `extends` and
     `applies` state the relation honestly, and a reciprocal pair is fine when each direction is true
     on its own. When a verb you would normally expect is absent, say why in `log.md`.
+12. **Writing outside the vault root.** A file that is not inside the vault root is not yours to
+    touch, however related it looks. The directory above a vault usually holds someone else's work,
+    and a vault sharing its directory with other files has all of them inside its blast radius. If
+    a source or a note seems to require a change out there, say so and let the user make it.
 
 ## Verification Checklist
 
@@ -235,6 +249,7 @@ findings as a hundred problems.
 - [ ] `structure/index.md` lists every note created or changed
 - [ ] `log.md` has one well-formed entry for the operation
 - [ ] Nothing under `raw/` was modified
+- [ ] Nothing outside the vault root was created, modified or deleted
 - [ ] Lint was run after writing, and its delta reported — or the checks that could not run were named
 
 ## One-Shot Recipes

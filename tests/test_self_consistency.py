@@ -48,11 +48,17 @@ PROTOCOL = {
 RAW_DIRS = ("raw/articles", "raw/papers", "raw/notes")
 VAULT_DIRS = (*RAW_DIRS, "permanent", "structure", "inbox")
 
+#: Init step 1: the vault gets its own folder rather than taking over the directory it runs in.
+#: This is the containment property — the vault root is the only place the skill writes, so
+#: whatever else shares that folder shares the blast radius.
+VAULT_DIRNAME = "zettelkasten"
+
 NOW = dt.date(2026, 9, 26)
 
 
-def init(root, *, domain: str = "how notes compound", stamp: str = "2026-09-26 14:30"):
-    """The Init section, performed. Steps 1-3 are the templates; 4 and 6 are the agent's."""
+def init(parent, *, domain: str = "how notes compound", stamp: str = "2026-09-26 14:30"):
+    """The Init section, performed. Step 1 is the folder, 2-3 the templates, 4 and 6 the agent's."""
+    root = parent / VAULT_DIRNAME
     for name in VAULT_DIRS:
         (root / name).mkdir(parents=True, exist_ok=True)
 
@@ -85,7 +91,7 @@ def init(root, *, domain: str = "how notes compound", stamp: str = "2026-09-26 1
 
 @pytest.fixture()
 def vault(tmp_path):
-    return init(tmp_path / "vault")
+    return init(tmp_path)
 
 
 def lint(root):
@@ -155,6 +161,27 @@ def test_the_log_example_is_not_read_as_an_undated_entry(vault):
     assert re.search(r"^```", text, flags=re.MULTILINE)
     document, _ = lint(vault)
     assert not [f for f in document["findings"] if f["code"] == "ZK022"]
+
+
+def test_the_vault_gets_its_own_folder_and_leaves_nothing_beside_it(tmp_path):
+    """Init step 1 — the containment property, asserted rather than described.
+
+    The vault root is the only place this skill writes, so a vault sharing its directory with
+    other files puts those files inside the blast radius. The scaffold must therefore *create*
+    a folder rather than adopt the one it was run in.
+    """
+    root = init(tmp_path)
+    assert root == tmp_path / VAULT_DIRNAME
+    assert {path.name for path in tmp_path.iterdir()} == {VAULT_DIRNAME}
+
+
+def test_the_body_states_the_write_boundary_in_both_places():
+    """The pitfall says what not to do; the checklist asks whether it was done. A boundary
+    stated in only one of them is the sort of rule that quietly stops being followed."""
+    body = BODY.read_text(encoding="utf-8")
+    assert "**Writing outside the vault root.**" in body
+    assert "- [ ] Nothing outside the vault root was created, modified or deleted" in body
+    assert "it gets its own folder rather than taking over the one you are" in body
 
 
 def test_the_domain_the_user_gives_reaches_the_schema(vault):
