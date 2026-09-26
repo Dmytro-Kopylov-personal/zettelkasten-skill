@@ -7,13 +7,332 @@ One capability, three platforms — Hermes, Claude Code, and GitHub Copilot — 
 shared body plus a thin per-platform seam, so the same skill behaves the same way wherever it
 runs.
 
-**New here? → [Getting started](GETTING-STARTED.md)** — install, your first vault, a worked ingest
-with real output, and what a good note looks like.
+The difference from a wiki is atomicity: a wiki has a page per *thing*, a Zettelkasten has a
+note per *idea*, and the value lives in the links between them. A note carries typed link verbs
+— `extends`, `supports`, `contradicts`, `source`, `applies`, `supersedes` — because "see also"
+claims nothing, and a folder of beautifully written unlinked notes is a pile.
+
+**Nothing reaches `permanent/` before you approve a plan, and no bundled script writes anything
+at all.** That is the short version. The full contract is under [Your files](#your-files), once
+you have seen it work.
+
+---
+
+## What you can ask for
+
+Four operations, and which one you want is decided by what you are holding.
+
+```mermaid
+flowchart LR
+  NOTHING["nothing yet"] --> INT["INIT<br/>scaffold a vault,<br/>ask what it is about"]
+  SRC["a source —<br/>a URL, a file, a paste"] --> ING["INGEST<br/>capture, discuss,<br/>propose, then write"]
+  Q["a question about<br/>what you have read"] --> QRY["QUERY<br/>answer with note IDs,<br/>file only new synthesis"]
+  MESS["a vault that feels<br/>messy or stale"] --> LNT["LINT<br/>report by severity,<br/>never edit anything"]
+
+  INT --> V[("your vault")]
+  ING --> V
+  QRY --> V
+  LNT --> V
+```
+
+You do not have to name the operation. Saying *"ingest this"*, *"what do my notes say about
+spacing"*, *"lint the vault"* or *"start me a Zettelkasten"* is enough; the skill recognises all
+four. [Your first vault](#your-first-vault) below is one of each.
+
+---
+
+## Install
+
+The skill is one directory — `SKILL.md` plus `references/`, `templates/` and `scripts/` —
+placed wherever your agent looks for skills.
+
+**On Claude Code**, install it as a plugin:
+
+```bash
+claude plugin marketplace add Dmytro-Kopylov-personal/zettelkasten-skill
+claude plugin install zettelkasten@zettelkasten-skill
+```
+
+In a session those are `/plugin marketplace add` and `/plugin install`. This is the tidy path: it
+keeps the skill in Claude Code's own plugin store, where updating and removing it are one command.
+Skip to [Your first vault](#your-first-vault) once it is in.
+
+**On Claude Code, Copilot or Hermes**, clone the repo and let the installer place it:
+
+```bash
+git clone https://github.com/Dmytro-Kopylov-personal/zettelkasten-skill.git
+cd zettelkasten-skill
+
+./install.sh --platform claude --dry-run --force   # counts what would change, writing nothing
+./install.sh --platform claude --force     # then for real — ~/.claude/skills/zettelkasten/
+./install.sh --platform copilot --force    # ~/.copilot/skills/zettelkasten/
+./install.sh --platform hermes --force     # ~/.hermes/skills/research/zettelkasten/
+```
+
+It lands in one directory, wherever that agent looks for skills:
+
+```mermaid
+flowchart LR
+  Q{"which agent?"} -->|claude| C["~/.claude/skills/zettelkasten/<br/>or a Claude Code plugin"]
+  Q -->|copilot| P["~/.copilot/skills/zettelkasten/<br/>or DIR/.github/skills/zettelkasten/"]
+  Q -->|hermes| H["~/.hermes/skills/research/zettelkasten/"]
+```
+
+**Start with `--dry-run`.** It names the destination, counts what would be written, backed up and
+left alone, and writes nothing at all — not one file, not even its bookkeeping manifest. On a first
+install it needs `--force` alongside it, which there only permits *looking* at a skills directory
+that does not exist yet. Drop `--dry-run` to install for real; keep `--force` for that first run.
+
+**`--force` is required the first time**, because the platform's skills directory usually does not
+exist until the agent has run at least once, and the installer refuses to invent one — a missing
+root may mean the platform is not installed at all. With `--force` it creates that one directory
+and nothing else. It never overwrites a file the installer did not write; the remedy there is for
+you to move the file, not to re-run with a flag. A file it *did* write is backed up to
+`.bak.<timestamp>` before being replaced, and re-running is a no-op.
+
+Leave `--platform` off and it detects what you have. Exit codes: 0 ok · 1 render failure ·
+2 usage · 3 platform not detected · 4 unmanaged file.
+
+Copilot has two locations, and they are different scopes:
+
+```bash
+./install.sh --platform copilot --force                    # personal: ~/.copilot/skills/
+./install.sh --platform copilot --project-root /path/repo  # project: /path/repo/.github/skills/
+```
+
+Install **one** personal copy per machine. Copilot's own help text also lists a project's
+`.claude/skills/` among the sources it reads, so a repo already carrying the Claude render might
+not need a second copy — untested here, and `copilot skill list` answers it before you install
+twice.
+
+**Copilot users:** do not use `copilot skill add <url>`. It fetches a single `SKILL.md` and nothing
+else, which installs a skill whose `references/` and `scripts/` are missing. Point it at the cloned
+directory instead, or use `install.sh`.
+
+### Or skip the install entirely
+
+The linter is a single stdlib-only file with no dependencies. It runs against any vault straight
+from a clone, which makes it usable in CI with nothing else installed:
+
+```bash
+python3 -I skill/scripts/zettel_lint.py /path/to/vault
+```
+
+No virtualenv, no `pip install`, no third-party imports. The `-I` is not decoration: it ignores
+`PYTHONPATH` and the user site directory, so a script that had grown a dependency would fail here
+rather than on a machine that happens to have it.
+
+---
+
+## Your first vault
+
+Four worked examples, in the order you will meet them. Each is marked with where it came from:
+three are real output, and the one that could not be is labelled rather than passed off.
+
+### 1. Start one — *real, run while writing this*
+
+> **You:** Start a Zettelkasten for me — its subject is how claims get verified.
+
+The agent creates the vault in a folder of its own, named `zettelkasten/`, rather than taking over
+the directory you are standing in:
+
+```
+zettelkasten/
+├── SCHEMA.md          the vault's own conventions — domain, tags, thresholds
+├── log.md             one line per operation, oldest first
+├── raw/               sources, captured and never edited again
+│   ├── articles/
+│   ├── papers/
+│   └── notes/
+├── permanent/         the notes
+├── structure/         index.md, concept-table.md, overview.md
+└── inbox/             quick captures awaiting triage
+```
+
+`SCHEMA.md` is the important one. It is the vault's constitution, and it **overrides the skill's
+defaults** — if your schema says two link verbs, the agent uses two.
+
+Then it lints the empty vault, which is the first place the design shows:
+
+```
+0 notes, 0 raw sources, 0 links, orphan rate 0%
+NOT RUN: ZK003..ZK030 (22 checks; not applicable: the vault has no permanent notes)
+NOT RUN: ZK014, ZK019, ZK026 (not applicable: the vault has no raw sources)
+NOT RUN: ZK029 (not applicable: only 0 links; the check needs 20)
+NOT RUN: ZK031 (not applicable: the inbox is empty)
+no findings
+```
+
+`no findings`, exit 0 — and twenty-seven checks named as **not run**. That distinction is the whole
+design: a check that cannot run is reported as not-run, never as a pass, so a small vault cannot
+read as a clean one by accident.
+
+### 2. Ingest a source — *real, from a recorded run*
+
+> **You:** Ingest `~/Downloads/spacing-and-the-forgetting-curve.md`
+
+The whole contract is the gate in the middle. Nothing reaches `permanent/` until you have seen what
+it intends to write and said yes:
+
+```mermaid
+flowchart TD
+  S["you point it at a source"] --> CAP["capture it into raw/<br/>with a sha256"]
+  CAP --> SEA["search the vault for notes<br/>already on the same idea"]
+  SEA --> PLAN["show you a plan —<br/>notes, titles, links, verbs"]
+  PLAN --> ASK{"you approve?"}
+  ASK -->|"no — too broad, not worth having"| REV["revise the plan"]
+  REV --> PLAN
+  ASK -->|"yes"| W["write the notes, link them<br/>both ways, update index and log"]
+  W --> L["run the linter and<br/>report what changed"]
+```
+
+It reads the source, searches the vault for anything already covering the same ground, then shows
+you a plan. This one is real output from a run, lightly trimmed for length:
+
+> **Reconnaissance** — `permanent/` is empty, so there are no existing notes to duplicate. The
+> vault's schema sets the domain — *how claims get verified* — and declares an **empty tag
+> taxonomy**, so I will assign no tags rather than invent them.
+>
+> **Plan**
+>
+> 1. **Capture** `source.md` → `raw/articles/spacing-and-the-forgetting-curve.md`, body reproduced
+>    byte-for-byte, with `ingested: 2026-09-26`. The `sha256` will be left **empty** with a comment
+>    giving the fix command: a fabricated digest is worse than a missing one — it would trigger a
+>    false drift alarm, whereas an absent one produces an accurate finding. `raw/` is immutable
+>    after this capture.
+> 2. **Four permanent notes** (atomic, claim-titled, `status: seed`, `confidence: medium` — single
+>    source, so never `high`):
+>
+>    | ID | Title |
+>    |---|---|
+>    | `202609261200` | Spacing works because retrieval after partial forgetting is effortful |
+>    | `202609261201` | How easy study feels is a poor guide to whether it worked |
+>    | `202609261202` | Testing changes the knowledge it measures |
+>    | `202609261203` | A retrieval attempt is worth most when it follows real forgetting |
+>
+> 3. **Eight links**, verbs drawn only from the vault's list. **No `supports` links**: these four
+>    notes come from a single source, and `supports` claims independent evidence — `extends` and
+>    `applies` state these relations honestly.
+> 4. **Register** — four lines in `structure/index.md`; one dated ingest entry plus one verification
+>    entry in `log.md`.
+
+Three things worth noticing. It searched before proposing. It refused to invent a digest rather
+than fabricate one. And it declined to use a link verb that would have been dishonest — linking
+notes derived from *one* source with `supports` would claim they corroborate each other.
+
+You approve, and only then does anything get written. If the plan is wrong — the notes too broad,
+one of them not worth having — you say so and it revises.
+
+### 3. Ask it something — *illustrative, not a recorded run*
+
+> **You:** What do my notes say about why spacing works?
+
+> **Agent:** Three notes bear on it.
+>
+> - `202609261200` — *Spacing works because retrieval after partial forgetting is effortful*:
+>   the benefit comes from reconstructing an answer that has partly decayed, not from the review
+>   schedule itself.
+> - `202609261201` — *How easy study feels is a poor guide to whether it worked*: rereading feels
+>   more productive than it is, which is why learners under-use spacing.
+> - `202609261203` — *A retrieval attempt is worth most when it follows real forgetting*: the
+>   effortful-reconstruction account predicts that a review timed before forgetting helps less.
+>
+> Together they say the mechanism is retrieval difficulty, and that it is self-concealing: the
+> conditions that feel least like learning are the ones that work. `202609261203` states this as a
+> prediction rather than a finding — the source does not test review timing directly.
+
+**This one is written, not recorded** — the repo has no stored query run, and the alternative was
+to pass off an invented answer as real. What it illustrates is the contract: the agent answers with
+note IDs so you can check the reasoning yourself, reads the notes in full rather than grepping, and
+**files a new note only if the answer is genuine synthesis** — something the existing notes do not
+already say. Here it is not, so nothing was filed.
+
+### 4. Check its work — *real, from a recorded run*
+
+> **You:** Lint the vault
+
+```
+error: 1
+  ZK014  raw/articles/spacing-and-the-forgetting-curve.md:1  the raw file records no sha256
+        subject: sha256
+        action:  run `zettel_lint.py hash <file>` and record the digest
+
+4 notes, 1 raw source, 8 links, orphan rate 0%
+NOT RUN: ZK016 (not applicable: SCHEMA.md declares no tag taxonomy)
+NOT RUN: ZK024 (not applicable: no note cites 3 or more sources)
+NOT RUN: ZK027 (not applicable: no note uses the 'contradicts' verb)
+NOT RUN: ZK029 (not applicable: only 8 links; the check needs 20)
+NOT RUN: ZK031 (not applicable: the inbox is empty)
+```
+
+The single `error` is the point. Nothing had computed the digest, so rather than passing the file
+the linter says so — and the five `NOT RUN` lines name the checks this vault is too small to
+exercise, instead of letting their silence read as a pass.
+
+The linter **never edits anything**. It reports; the agent proposes a fix; you approve. The remedy
+for the finding above is `zettel_lint.py hash <file>`, which prints a digest for you to record —
+it does not write it into the file.
+
+---
+
+## What a note looks like
+
+A real note, produced by an ingest of the source above. Verbatim apart from line-wrapping, which
+is reflowed to fit this page:
+
+```markdown
+---
+id: "202609261202"
+title: Testing changes the knowledge it measures
+type: permanent
+status: seed
+created: 2026-09-26
+updated: 2026-09-26
+sources:
+  - raw/articles/spacing-and-the-forgetting-curve.md
+confidence: medium
+links:
+  - target: 202609261200-spacing-works-through-effortful-reconstruction
+    verb: extends
+  - target: 202609261201-fluency-during-study-is-a-poor-guide-to-learning
+    verb: extends
+---
+
+Retrieval practice is a separate mechanism from spacing, with a similar profile, and its effect
+is not confined to measurement: the act of retrieving changes what will be known later.
+^[raw/articles/spacing-and-the-forgetting-curve.md]
+
+A test is therefore not a neutral reading of a learner's state. It reports where the memory
+stands when it is taken, and it also alters where the memory will stand afterwards; the source
+treats the second as a mechanism in its own right rather than as a side effect of measuring.
+^[raw/articles/spacing-and-the-forgetting-curve.md]
+
+## Links
+
+- **extends** [[202609261200-spacing-works-through-effortful-reconstruction]] — generalizes its
+  mechanism: reconstruction is a property of retrieval, not of a review schedule
+- **extends** [[202609261201-fluency-during-study-is-a-poor-guide-to-learning]] — adds a second
+  way a learner's own assessment misleads: the probe changes what it probes
+```
+
+Four things carry the weight:
+
+- **`id`** is `YYYYMMDDHHMM`, and the filename is `id-slug.md`. Stable identity means a link does
+  not break when you retitle a note.
+- **`sources:`** names what the claim came from, and **`^[...]` markers** in the body say which
+  paragraph came from where. This is what makes a claim checkable later.
+- **`links:` with a `verb`** — not a bare "see also". The six verbs are listed above, and each one
+  makes a different claim.
+- **One idea.** If you find yourself writing "and", it is probably two notes.
+
+A folder of beautifully written unlinked notes is a pile, and the linter will say so.
+
+---
 
 ## Your files
 
 This skill writes into a vault you own, so what it will and will not touch matters more than
-anything below.
+anything above.
 
 **Nothing reaches `permanent/` before you approve a plan.** Ingest captures the source, searches
 the vault for notes already covering the same ground, then shows you what it intends to create —
@@ -50,130 +369,7 @@ One honest limit: that boundary is a rule the body states and a grader checks, n
 agent runs with your permissions, as agents do. If you want a wall rather than a checked contract,
 point it at a directory whose only contents are the vault.
 
-## What it does
-
-| Operation | Contract |
-|---|---|
-| **init** | Scaffold a vault: `raw/`, `permanent/`, `structure/`, `inbox/`, `SCHEMA.md`, `log.md` |
-| **ingest** | Capture a source with a `sha256`, discuss it, search first, **propose a plan**, then write |
-| **query** | Search, read notes in full, answer with note IDs, and file only genuine synthesis |
-| **lint** | Report, never auto-fix. Structural errors first, then orphans, decay, advisory |
-
-The difference from a wiki is atomicity: a wiki has a page per *thing*, a Zettelkasten has a note
-per *idea*, and the value lives in the links. A note carries typed link verbs — `extends`,
-`supports`, `contradicts`, `source`, `applies`, `supersedes` — because "see also" claims nothing,
-and a folder of beautifully written unlinked notes is a pile. Lint will say so.
-
-## Layout
-
-```
-src/          render sources, never shipped
-  SKILL.template.md      the shared body, with {{FRONTMATTER}} and {{ENVIRONMENT}} seams
-  render.py              stdlib-only renderer + fail-closed per-platform validator
-  fragments/             frontmatter.<platform>.yaml, environment.<platform>.md
-skill/        the shipped payload: references/, templates/, scripts/
-tests/        golden renders, invariants, fixtures, real-validator adapters
-docs/         design notes, the plan, and measured results
-```
-
-`tests/golden/<platform>.SKILL.md` is the committed render: both the reviewable artifact and the
-byte-exact oracle `--check` diffs against. `skill/SKILL.md` is committed too, because this repo
-doubles as a Claude Code plugin and a plugin must ship a loadable `SKILL.md` — a gitignored one
-installs as zero skills. A test asserts the two are byte-identical, so the golden stays the
-source of truth rather than becoming one of two.
-
-`docs/architecture.md` draws the shape: one body assembled into three renders, and exactly where
-the three contracts pull apart.
-
-## Install
-
-### Claude Code
-
-```bash
-claude plugin marketplace add Dmytro-Kopylov-personal/zettelkasten-skill
-claude plugin install zettelkasten@zettelkasten-skill
-```
-
-In a session, the same thing as `/plugin marketplace add` and `/plugin install`. Verified end to
-end: after installing, a headless session's own init event lists `zettelkasten:zettelkasten`
-among its skills.
-
-### Everywhere else
-
-```bash
-git clone https://github.com/Dmytro-Kopylov-personal/zettelkasten-skill.git
-cd zettelkasten-skill
-
-./install.sh --platform claude --dry-run --force   # what would change, writing nothing
-./install.sh --platform claude --force             # then for real; or copilot, or hermes
-```
-
-`--dry-run` names the destination directory, counts what would be written, backed up and left
-alone, and writes nothing — not one file, not even its bookkeeping manifest. On a first install it
-needs `--force` as well, which there only permits *looking* at a skills directory that does not
-exist yet. Omit `--platform` to detect what you have.
-
-It renders, validates, then copies `SKILL.md`, `references/`, `templates/` and `scripts/` into the
-platform's skills tree. Re-running it is a no-op; a file it did not write is **refused** (exit 4)
-rather than overwritten, and a file it did write is backed up to `.bak.<utc>` before being replaced.
-Ownership is recorded as a digest manifest in
-`${XDG_STATE_HOME:-$HOME/.local/state}/zettelkasten-skill/` — outside every skills tree, so an
-OS-level backup cannot carry it into a vault.
-
-Exit codes: 0 ok · 1 render failure · 2 usage · 3 platform not detected · 4 unmanaged file.
-
-**`--force` is needed on a first install**, because the platform's skills directory usually does not
-exist until the agent has run once, and the installer will not invent one — a missing root may mean
-the platform is not installed at all. `--force` creates that one directory and nothing else. It
-never overrides a refusal: the remedy for an unmanaged file is a person moving it, not a flag.
-
-Copilot has two locations, and they are different scopes:
-
-```bash
-./install.sh --platform copilot --force                    # personal: ~/.copilot/skills/
-./install.sh --platform copilot --project-root /path/repo  # project: /path/repo/.github/skills/
-```
-
-Install **one** personal copy per machine. Copilot's own help text also lists a project's
-`.claude/skills/` among the sources it reads, so a repo already carrying the Claude render might not
-need a second copy — untested here, and `copilot skill list` answers it before you install twice.
-
-Copilot CLI can also take a URL — `copilot skill add <https://…/SKILL.md>` — and **that path gives
-you a broken install.** It fetches a single `SKILL.md` and materialises nothing else, so the skill
-would load with its `references/`, `scripts/` and `templates/` all missing: a body that tells the
-agent to read files that are not there, and a linter that does not exist. Use `install.sh`, or clone
-the repo and point `copilot skill add` at the directory instead.
-
-## Use
-
-```bash
-make check     # render all three platforms and diff against tests/golden/
-make test      # the full suite (uv run --with pytest --with pyyaml)
-make render    # write renders to dist/
-make goldens   # adopt the current renders as the oracle — then read the diff
-```
-
-The linter runs against a vault directly, with no install step at all:
-
-```bash
-python3 -I skill/scripts/zettel_lint.py /path/to/vault --json
-```
-
-No virtualenv, no `pip install`, no third-party imports: `render.py` and the bundled linter are
-stdlib-only single files, so they run wherever a Python 3 exists. The test suite is the only part
-that wants `uv`, and it uses it to fetch its own dependencies.
-
-The platform acceptance run is not part of the suite, because it calls a model:
-
-```bash
-python3 tests/acceptance/run_ingest.py --runs 3 --json /tmp/ingest.json
-python3 tests/acceptance/run_ingest.py --rescore /tmp/ingest.json   # no model calls
-```
-
-It builds a throwaway vault by performing Init literally, hands a real agent a source from outside
-it, and scores the result with the shipped linter plus four protocol markers read out of the session
-record. `--rescore` recomputes the transcript markers from stored sessions, so a correction to how
-the transcript is read costs nothing to apply.
+---
 
 ## Obsidian
 
@@ -200,53 +396,7 @@ Three things to know rather than discover:
   as one. `id: "202609261430"` is `Text`. Both parse and lint identically; the skeleton and the
   format reference use the quoted form.
 
-## Why it is built this way
-
-`docs/design.md` records the findings that changed the design, each with what established it — a line
-in a platform's own source, an executed validator, or a run that went wrong. These are the ones that
-shape daily use.
-
-- **`platforms:` in Hermes is an OS gate, not an agent gate.** `platforms: [copilot, hermes]` reads
-  perfectly reasonably and makes the skill invisibly absent on every machine. The Hermes fragment
-  declares `[linux, macos, windows]`, and a test refuses anything else.
-- **Hermes truncates the description to 57 characters in its catalog**, appending an ellipsis. That
-  truncated string is the entire discovery surface, so the trigger verbs are front-loaded and a test
-  fails if they stop landing inside the first 53.
-- **Three platforms, three different frontmatter contracts.** Anthropic's own `quick_validate.py`
-  rejects Hermes house style (`version`, `author`, `platforms`), so the per-platform seam is a
-  requirement rather than a preference.
-- **No tool names in the shared body.** The body is written in capability language ("read the note",
-  never `` `read_file` ``), and a denylist enforces it over the template and every shipped reference
-  file — with a positive and a negative control, so neither a check that flags everything nor one
-  that flags nothing can pass.
-- **Naive wikilink scanning false-positives on contact.** `[[500, 375]]` from a NumPy expression
-  inside a code fence is the top match in a real vault, and `[[wikilinks]]` in prose *describing*
-  wikilinks is the second. Code fences and inline code are stripped before extraction, and a fixture
-  of four such traps asserts they stay silent.
-- **Hermes' frontmatter parser has a degraded path that hides the skill.** When PyYAML is missing —
-  or any single line raises — it splits every line on its first colon, so
-  `platforms: [linux, macos, windows]` parses as the *string* `"[linux, macos, windows]"`, which no
-  OS name starts with. The gate wraps it in a one-element list, nothing matches, and the skill is
-  silently absent: the first failure through a second door. This one did **not** change the design —
-  every other OS-gated skill in a Hermes tree declares it the same way, so the degraded parser hides
-  all of them and the remedy is upstream. It changed the tests instead: one asserts the shipped
-  render parses under the installed parser to a real list, and a control forces the fallback and
-  asserts it really does hide the skill.
-- **A note one directory deep was invisible.** `permanent/` was scanned with a flat `glob("*.md")`
-  while `raw/` and `inbox/` used `rglob`, so a note filed in a subdirectory was not collected — and
-  the run then reported *0 notes, no findings*, exit 0, which reads exactly like a clean vault. That
-  is the failure this whole repository is built to catch, and it was in the repository. `permanent/`
-  now walks the tree; links resolve by note rather than by string, so `[[note]]`, `[[sub/note]]` and
-  `[[note.md]]` all credit the same note and cannot produce a phantom orphan. `structure/` stays flat
-  on purpose — its files have fixed names and roles, so a nested `index.md` is a sub-list, not the
-  index.
-
-The same reasoning drives the linter: it is verified against hand-labelled fixtures whose
-`MANIFEST.md` is written before the code runs, and a check that cannot run says so in
-`skipped_checks` rather than reporting a clean result. Matching a manifest is not enough on its own —
-it shows the right findings appeared, not that the right *check* produced them — so each expected
-finding is attributed by silencing its check in the registry and requiring exactly that check's
-findings to disappear.
+---
 
 ## What has not been verified
 
@@ -255,8 +405,8 @@ Stated here rather than left for you to find out.
 **Copilot's VS Code extension and cloud agent were never exercised.** Only the CLI was, and the
 listing there is the only discovery claim this repo makes.
 
-**Copilot CLI's discovery of a project-local `.claude/skills/` is untested**, which is why the README
-suggests checking before installing a second copy.
+**Copilot CLI's discovery of a project-local `.claude/skills/` is untested**, which is why the
+install section above suggests checking before installing a second copy.
 
 **The ablation is weaker than it looks.** Both eval cases score 1.00 with the skill and below
 threshold without, but each delta rests on a single grader that tests a *naming convention*, so it
@@ -270,21 +420,37 @@ detectable after the fact — that is the mitigation, not a guarantee.
 `docs/results.md` carries the measurements and every unverified marker; `docs/plan.md` the phase
 gates.
 
-## A note for contributors
+---
 
-**`.githooks/commit-msg` rejects any `Co-authored-by:` trailer.** It is tracked in the repo but not
-active by default, because `core.hooksPath` is local configuration rather than something a clone
-inherits. Turn it on if you want your commits checked before they land:
+## Going deeper
 
-```bash
-git config core.hooksPath .githooks
-```
+| | |
+|---|---|
+| `skill/references/note-format.md` | the note contract, field by field |
+| `skill/references/schema-reference.md` | `SCHEMA.md`, the six verbs, thresholds, the Page Threshold |
+| `skill/references/lint-checks.md` | all 32 checks: predicate, remediation, and a manual-scan line |
+| `skill/references/tool-free-fallback.md` | what to do with no shell |
+| `docs/architecture.md` | how it is shaped, and where the three platforms pull apart — diagrams |
+| `docs/design.md` | why it is built this way, including what went wrong on the way |
+| `docs/results.md` | what has actually been measured, and what has not |
+| `CONTRIBUTING.md` | the repo layout, the build, and the standard a change has to meet |
 
-**Adding a check means adding a way for it to fail.** Every instrument here carries a control in the
-opposite direction, so a check that flags everything and one that flags nothing cannot both pass —
-`docs/design.md` says why, at length, and `docs/results.md` records what each control caught. That is
-the standard this repo holds itself to, and it is the most useful thing to read before changing
-`zettel_lint.py`.
+### When the agent has no shell
+
+Some environments ship an agent with no way to run a command. The skill degrades rather than
+breaking: `references/tool-free-fallback.md` gives a manual procedure for every check, and requires
+the agent to **name the checks it could not perform** rather than implying a clean vault. The
+`NOT RUN` lines above are the same obligation where the linter *does* run: coverage is stated, so
+silence is never mistaken for a pass.
+
+### A note on trust
+
+Every claim in this repo is backed by something checkable, and this README names what was *not*
+verified — Copilot's VS Code extension, the Copilot cloud agent — rather than leaving you to find
+out. The measurements carry the same markers, including where the skill's own evaluation turned out
+to be weaker than it looked (`docs/design.md`, finding V8; the run trees are in `docs/results.md`).
+
+---
 
 ## Licence
 

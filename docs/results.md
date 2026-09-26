@@ -48,7 +48,8 @@ its three traps was verified by reintroducing the original code and watching the
 restored is decoration, so the mutation is recorded with each trap in its `MANIFEST.md` rather than
 assumed.
 
-**A published claim the evidence contradicted.** `GETTING-STARTED.md` said its linter output came
+**A published claim the evidence contradicted.** `GETTING-STARTED.md` — a separate guide at the
+time, since folded into the README — said its linter output came
 from a session with **no shell**, which was offered as the reason the digest was missing. The
 output cannot have come from such a session: it contains `NOT RUN: ZK016 (not applicable: SCHEMA.md
 declares no tag taxonomy)` and `4 notes, 1 raw source, 8 links, orphan rate 0%`, and the strings
