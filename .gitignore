@@ -13,3 +13,7 @@ __pycache__/
 
 # Installer scratch
 *.bak.*
+
+# Eval output. The cases under skill/evals/ are tracked and reviewed; a run's HTML report and
+# aggregate JSON are artifacts of one execution, not part of the suite.
+skill/evals/results/

@@ -1,6 +1,24 @@
-.PHONY: check render goldens test lint-fixtures clean
+.PHONY: check render goldens test lint-fixtures eval-lint eval-claude clean
 
 UV := uv run --with pytest --with pyyaml
+
+#: The eval target is the repo's `skill/` directory, so it needs a render in place first.
+#: `skill/SKILL.md` is gitignored precisely because it is a build artifact.
+SKILL_MD := skill/SKILL.md
+
+# `claude plugin eval` needs a resolvable skill, and `skill/` has no SKILL.md until rendered.
+$(SKILL_MD): src/SKILL.template.md src/fragments/frontmatter.claude.yaml src/fragments/environment.claude.md
+	python3 src/render.py --platform claude --out dist
+	cp dist/claude/SKILL.md $(SKILL_MD)
+
+eval-lint: $(SKILL_MD) ## validate every eval case and run none — no model, no cost
+	claude plugin eval skill --trust-plugin --case __lint__
+
+eval-claude: $(SKILL_MD) ## Claude acceptance: the with/without ablation (calls a model, costs money)
+	claude plugin eval skill --trust-plugin \
+		--allow-tools Write Edit \
+		--scaffold --ablation with-without \
+		--json skill/evals/results/ablation.json
 
 check: ## render in memory and diff against tests/golden/ (what CI runs)
 	python3 src/render.py --check

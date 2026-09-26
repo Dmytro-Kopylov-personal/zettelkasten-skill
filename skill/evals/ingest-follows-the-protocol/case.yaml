@@ -1,0 +1,30 @@
+schema_version: "1.1"
+name: ingest-follows-the-protocol
+description: >-
+  A vault is scaffolded without example entries, and a source is ingested into it. The
+  graders read what the run produced: a note under permanent/, and the two files whose
+  paths the protocol fixes, structure/index.md and log.md.
+tags: [protocol, ingest]
+runs: 2
+
+# `scaffold_script` is a *path*, relative to this case directory, and it only runs under
+# `--scaffold`. An inline block here is accepted by the YAML reader and then dropped without
+# a word, so the case runs against an unstaged workspace and the graders fail on files that
+# were never written — which is exactly how this suite failed the first time it was run.
+context:
+  scaffold_script: stage.sh
+
+# These three were at the top level at first, and were silently dropped: the report recorded
+# `maxTurns 10, timeoutSeconds 300` while this file said 40 and 900. Unknown keys are not
+# rejected in case.yaml, so a misplaced key is invisible except in the JSON.
+#
+# No `Bash`, and not by preference. `claude plugin eval` refuses to run a Bash-granting case
+# on this machine at all — the sandbox cannot reliably exclude `~/.docker`, whose credential
+# store holds a symbolic link, so the run aborts before the model is called. The skill does
+# not need a shell (its Claude render declares no `allowed-tools`, and the body ships
+# `references/tool-free-fallback.md` for exactly this). The consequence to remember: the
+# bundled linter is never exercised *inside* an eval run — it has its own suite instead.
+execution:
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Write, Edit, Glob, Grep, Skill]

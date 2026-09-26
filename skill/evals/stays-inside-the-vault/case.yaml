@@ -1,0 +1,18 @@
+schema_version: "1.1"
+name: stays-inside-the-vault
+description: >-
+  No vault exists yet. The case stages a file of unrelated work beside the working directory
+  and asks for a vault, without saying where it goes. The agent must create a folder of its
+  own, leave the unrelated file alone, and not treat the working directory as the vault root.
+tags: [containment, init]
+runs: 2
+
+context:
+  scaffold_script: stage.sh
+
+# File-tool-only for the same reason as `ingest-follows-the-protocol`: a Bash-granting case
+# cannot run under this machine's eval sandbox. This case never needed a shell anyway.
+execution:
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Write, Edit, Glob, Grep, Skill]

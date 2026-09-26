@@ -2,6 +2,110 @@
 
 Measurements, appended as phases complete. A phase's gate is met here or it is not met.
 
+## P6 — Claude acceptance (2026-09-26)
+
+**Four results, three of them clean.**
+
+**Installed and byte-identical.** `~/.claude/skills/zettelkasten/` holds the Claude render
+and its references, templates and scripts, every file equal to `tests/golden/claude.SKILL.md`
+and to `dist/claude/`. `skill/evals/` is tracked and reviewed but **never installed** — a
+dry-run reports 11 files to write and no `evals/`, `case.yaml` or `stage.sh` among them, and
+adding the suite broke no invariant (518 tests, unchanged). An acceptance suite that ships
+with the skill would be scaffolding in a user's vault.
+
+**`quick_validate.py` exits 0, calibrated in both directions.** It passes the shipped render
+and it fails a deliberately broken one, naming the offending key — so the exit code is
+evidence rather than a check that cannot fail. Which is the whole problem with the validator
+the gate originally named:
+
+**`claude plugin validate` cannot validate a skill (V7), so the P6 gate struck it.** Its help
+text promises "the skills, agents, and commands in a directory", but it descends only into
+component directories the *manifest* declares; `contents` came back `[]` for every target
+tried. A skill with a non-kebab name, angle brackets in its description and an unrecognised
+`version` key passed identically to a good one, as did a deliberately broken slash command —
+`success: true`, `contents: []`, exit 0 under `--strict`. The manifest half is real (a
+missing `author` does fail), but as a *skill* validator it is a check that cannot fail, and
+the gate as written would have been satisfied by it. Replaced with the two instruments that
+move in both directions: `quick_validate.py`, and discovery.
+
+**Discovered, with a control.** `claude --debug-file` reports
+`Loaded N unique skills (… user: N …)`, and the count moves **1 → 0 → 1** as the skill is
+installed, parked and restored. A headless `claude -p --output-format stream-json --verbose`
+init event carries the named `skills` array, which is what turns the count into a name.
+`/skills` is `local-jsx` and interactive-only, so it is not scriptable — a session's own init
+trace lists `skill:zettelkasten` among its `slash_commands` instead.
+
+**`allowed-tools` is not declared**, and the reason is recorded in the plan: the body ships
+`references/tool-free-fallback.md`, so a machine without a shell degrades rather than breaks,
+and a declared list would be a guess about a surface no local validator inspects (V7) — wrong
+silently rather than loudly.
+
+### The ablation: the delta is real, and it is not the behaviour the cases are named for
+
+`claude plugin eval skill --trust-plugin --allow-tools Write Edit Read Glob Grep Skill
+--scaffold --runs 1 --ablation with-without --max-cost-usd 10 --keep-temp` — 1151s, $7.54,
+`claude` 2.1.281.
+
+| Case | with | without | Δ | Graders that separated the arms |
+|---|---:|---:|---:|---|
+| `ingest-follows-the-protocol` | 1.00 | 0.667 | 0.333 | `note-created` — only |
+| `stays-inside-the-vault` | 1.00 | 0.750 | 0.250 | `vault-in-its-own-folder` — only |
+
+`meanDelta` 0.292, `passRateWithout` 0 for both, threshold 1.0 met by both with-arms and
+neither without-arm. Read alone, that is a clean acceptance. Read against the kept run trees
+(`--keep-temp`, unsealed and inspected), it says something narrower.
+
+**Case 1, without the skill.** The agent was told to ingest one source into "the Zettelkasten
+vault at `vault`". With no skill loaded it wrote six atomic notes into `vault/notes/`, a
+source copy into `vault/sources/`, an index of **seven wikilinks**, and a log with a dated
+bullet and a back-link. So `indexed-the-note` and `logged-the-operation` passed in *both*
+arms: a competent agent already indexes, links and logs when a prompt says "Zettelkasten".
+The single grader that separated the arms was the glob `vault/permanent/*.md` — a **directory
+name**.
+
+**Case 2, without the skill.** Told nothing about containment, the agent still did not adopt
+its working directory: it created exactly one folder and wrote inside it. All three
+containment graders — the two `exists: false` checks and the untouched-file regex — passed in
+both arms. The one that separated them was `zettelkasten/SCHEMA.md`, i.e. **the template**.
+
+So the measured contribution of this skill, on these two cases, is the *schema* it supplies —
+`permanent/` rather than `notes/`, a materialised `SCHEMA.md` — not the behaviour each case is
+named after. Both cases pass their gate and the direction is consistent, but the discriminating
+surface is one grader each. **A grader a competent agent passes without the skill is not
+measuring the skill**, which is the flags-nothing failure this repo exists to catch, one layer
+up: not a check that cannot fail, but a check that cannot *discriminate*. The cases need a
+grader whose answer depends on something only the body supplies — the id↔filename contract, a
+`sha256` on the captured source, a link verb from the closed set, a `sources:` field — none of
+which the without-arm vaults have, because `vault/notes/spaced-practice-beats-massed-practice.md`
+carries no id and its index is a plain bulleted list.
+
+**This is not Claude evidence.** Every one of the four runs executed as **`deepseek-flash`** —
+59, 32, 54 and 59 API events per trace, all the same model, read out of the `--keep-temp`
+`trace.jsonl` files. `--model` was not passed on this invocation, and the child runs inherit
+the enclosing session's model; an earlier run recorded `modelOverride: sonnet` while executing
+as `deepseek-flash`, so the field is a record of what was *asked for*. The numbers above are a
+real ablation of a real agent, but they are not numbers about Claude, and no row here may be
+quoted as if they were. `make eval-claude` is the same command to run from a plain terminal for
+those.
+
+**Two things found by running it.**
+
+1. The report echoes `runsPerCase: 2` from `case.yaml` while `--runs 1` on the command line ran
+   one per arm. So this is N=1 per arm and there is no variance figure — the P5 gate recorded a
+   pass rate over three runs; this one cannot.
+2. Claude Code writes its own `.write-probe` and `.probe-nested/deeper.md` into the run's
+   working directory, self-labelled *"Temporary write-permission probe … Safe to delete."* They
+   are the harness's, not the agent's, and no current grader matches them — but a `file_exists`
+   glob of `**/*.md` would. Recorded so that nobody authors one.
+
+**The schema fix is confirmed in the artifact.** The report's `maxTurns` 40 and
+`timeoutSeconds` 900 now match `case.yaml`; before the fix it read 10 and 300, because those
+keys sat at the top level and `case.yaml` silently ignores what it does not recognise. The same
+silence swallowed `scaffold_script` while it was an inline block — it must be a **path** under
+`context:`, and the run recorded `source: mixed`. Both facts are now comments in the case files.
+
+**Suite:** 518 passed, 0 skipped, ~10.7s. `make check` green for all three platforms.
+
 ## P5 — Hermes acceptance (2026-09-26)
 
 **Installed, visible, pinned.** `./install.sh --platform hermes` wrote 11 files into
