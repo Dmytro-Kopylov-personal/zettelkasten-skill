@@ -33,11 +33,20 @@ fifteen turns trying to `printenv` the variable and never got a value: the shell
 approval and a headless run has nobody to give one. The agent then reported step 4 (ask) and named
 the three steps that had failed, which is the skill behaving correctly with a tool it does not
 have — but it is not a pin. An interactive session prompts instead, so the ordinary path works.
-Claude Code's settings file takes an `env` block that would put the variable in the process
-regardless of how it was launched, including the desktop and VS Code surfaces the README lists as
-unverified; that was **not tested**, so it is recorded here as a candidate rather than a remedy.
-Copilot and Hermes both name the skill in their own listings (`copilot skill list`, `hermes skills
-list`), and both are launched from a shell, so both inherit the pin.
+**The settings `env` block was added and measured.** Claude Code's settings file takes an `env`
+block that puts the variable in the process regardless of how it was launched, including the
+desktop and VS Code surfaces the README lists as unverified. Injection is confirmed by the debug
+log — `settingsEnv keys: CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC, ANTHROPIC_BASE_URL,
+ZETTELKASTEN_VAULT_PATH` — so the value is in the process even for a headless run started from an
+unrelated directory. It is still not readable by the agent there, and the reason is the same one
+that produced the whole finding: reading it means running `printenv`, that call needs an approval,
+and a `-p` run has nobody to give one. The run said so rather than working around it. So the block
+covers the surfaces where a human is present to approve, and a headless run resolves by the first
+step instead — the path in the request, which a script already knows. A standing permission for
+that one read-only command would close the gap; it was offered and declined, so the boundary stays
+where it is rather than widening to save a caller one argument. Copilot and Hermes both name the
+skill in their own listings (`copilot skill list`, `hermes skills list`), and both are launched
+from a shell, so both inherit the pin.
 
 ## The release pass (2026-09-26)
 
