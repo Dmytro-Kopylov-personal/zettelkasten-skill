@@ -2,6 +2,40 @@
 
 Measurements, appended as phases complete. A phase's gate is met here or it is not met.
 
+## P7 — Copilot acceptance (2026-09-26)
+
+**Installed and discovered.** `./install.sh --platform copilot --force` wrote 11 files into
+`~/.copilot/skills/zettelkasten/` — the skills root did not exist, and `--force` creates it,
+which is the only thing `--force` does. `copilot skill list` then prints:
+
+```
+Personal skills:
+  zettelkasten - Maintain an atomic, densely-linked Zettelkasten vault of permanent notes. Use when the user drops a source to ingest, asks a question of their notes, or says lint, audit or health-check.
+```
+
+**Discovery did not need an interactive terminal after all.** The plan expected `/skills list`,
+which is a slash command and therefore not scriptable; Copilot CLI 1.0.88 also ships
+`copilot skill` as a *subcommand* with `list`, `add`, `remove`, `enable`, `disable`. So the
+check is scriptable and reproducible, and it is the command recorded rather than a keystroke
+sequence someone would have to transcribe.
+
+**The description arrives whole, unlike Hermes.** V2 is Hermes-specific: its catalog shows
+`description[:57] + "..."`, which is why the trigger verbs are front-loaded. Copilot's listing
+prints the full sentence. The front-loading costs nothing and is asserted for Hermes, so
+nothing changes — but the finding is bounded to the platform that caused it, and this is the
+evidence for that boundary.
+
+**Copilot's source list, read from its own help.** Personal skills come from `~/.copilot/skills/`
+and `~/.agents/skills/`; project skills from `.github/skills/`, `.agents/skills/` or
+`.claude/skills/`. That last entry means a repository already carrying the Claude render may
+well be discovered without a second copy — it is recorded as an untested overlap, and
+`copilot skill list` is the command that settles it, not a claim.
+
+**What this does not show.** No ingest acceptance was run on Copilot, so there is no Copilot
+equivalent of the Hermes 3/3. The VS Code extension and the Copilot cloud agent were not
+exercised at all, and the README ships that as an explicit **unverified** marker rather than a
+footnote. The CLI listing is the whole of the discovery claim.
+
 ## P6 — Claude acceptance (2026-09-26)
 
 **Four results, three of them clean.**

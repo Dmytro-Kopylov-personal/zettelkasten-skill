@@ -59,6 +59,27 @@ an OS-level backup cannot carry it into a vault.
 
 Exit codes: 0 ok · 1 render failure · 2 usage · 3 platform not detected · 4 unmanaged file.
 
+A skills root that does not exist yet needs `--force`, which creates it. That is the only
+thing `--force` does — it never overrides a refusal, because the remedy for an unmanaged file
+is a person moving it, not a flag.
+
+Copilot has two locations, and they are different scopes:
+
+```bash
+./install.sh --platform copilot --force                    # personal: ~/.copilot/skills/
+./install.sh --platform copilot --project-root /path/repo  # project: /path/repo/.github/skills/
+```
+
+Install **one** personal copy per machine. Copilot's own help text also lists a project's
+`.claude/skills/` among the sources it reads, so a repo already carrying the Claude render
+might not need a second copy — untested here, and `copilot skill list` answers it before you
+install twice.
+
+Verified after installing: `copilot skill list` prints the skill under *Personal skills* with
+its description untruncated, discovered from `~/.copilot/skills/`. **Unverified:** the VS Code
+extension and the Copilot cloud agent were never exercised here. The CLI listing is the only
+discovery claim this repo makes.
+
 ## Use
 
 ```bash
@@ -131,11 +152,23 @@ requiring exactly that check's findings to disappear.
 
 ## Status
 
-The render layer, the linter and the installer are complete and green (518 tests). Hermes is
-accepted: installed, listed, pinned, its catalog line verified against a live session's
-system prompt, and a three-run scripted ingest **3/3** with zero findings from every vault
-(`docs/results.md`). Claude and Copilot acceptance are outstanding. `docs/plan.md` carries
-the phase gates.
+The render layer, the linter and the installer are complete and green (**518 tests**), and the
+skill is installed and discovered on all three platforms:
+
+| Platform | Installed to | Discovery verified by | Ingest acceptance |
+|---|---|---|---|
+| Hermes | `~/.hermes/skills/research/zettelkasten/` | `hermes skills list`, and a live session's system prompt | **3/3** runs, zero findings |
+| Claude Code | `~/.claude/skills/zettelkasten/` | `Loaded N unique skills` moving 1 → 0 → 1, and a headless init event naming it | ablation run — see the caveat |
+| Copilot CLI | `~/.copilot/skills/zettelkasten/` | `copilot skill list`, description untruncated | not run |
+
+`docs/results.md` carries the measurements; `docs/plan.md` the phase gates.
+
+**Two caveats, stated rather than buried.** Copilot's VS Code extension and cloud agent were
+never exercised — the CLI listing is the only discovery claim made here. And the Claude
+ablation's aggregate is misleading read alone: both cases score 1.00 with the skill and below
+threshold without, but each delta rests on a single grader that tests a *naming convention*,
+so it demonstrates less than "the skill works" (V8, `docs/design.md`). Every run in it
+executed as `deepseek-flash`, not Claude.
 
 ## Licence
 
