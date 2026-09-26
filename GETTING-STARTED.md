@@ -12,6 +12,29 @@ it intends to create before any file appears.
 
 ---
 
+## What you can ask for
+
+Four operations, and which one you want is decided by what you are holding.
+
+```mermaid
+flowchart LR
+  SRC["a source —<br/>a URL, a file, a paste"] --> ING["INGEST<br/>capture, discuss,<br/>propose, then write"]
+  Q["a question about<br/>what you have read"] --> QRY["QUERY<br/>answer with note IDs,<br/>file only new synthesis"]
+  MESS["a vault that feels<br/>messy or stale"] --> LNT["LINT<br/>report by severity,<br/>never edit anything"]
+  NOTHING["nothing yet"] --> INT["INIT<br/>scaffold a vault,<br/>ask what it is about"]
+
+  ING --> V[("your vault")]
+  QRY --> V
+  LNT --> V
+  INT --> V
+```
+
+You do not have to name the operation. Saying *"ingest this"*, *"what do my notes say about
+spacing"*, *"lint the vault"* or *"start me a Zettelkasten"* is enough; the skill recognises all
+four. Everything below is one of these four, in the order you will meet them.
+
+---
+
 ## Install
 
 The skill is one directory — `SKILL.md` plus `references/`, `templates/` and `scripts/` —
@@ -31,10 +54,19 @@ Skip to [Your first vault](#your-first-vault) once it is in.
 **On Claude Code, Copilot or Hermes**, clone the repo and let the installer place it:
 
 ```bash
-./install.sh --platform claude --dry-run --force   # see what it would write, writing nothing
+./install.sh --platform claude --dry-run --force   # counts what would change, writing nothing
 ./install.sh --platform claude --force     # then for real — ~/.claude/skills/zettelkasten/
 ./install.sh --platform copilot --force    # ~/.copilot/skills/zettelkasten/
 ./install.sh --platform hermes --force     # ~/.hermes/skills/research/zettelkasten/
+```
+
+It lands in one directory, wherever that agent looks for skills:
+
+```mermaid
+flowchart LR
+  Q{"which agent?"} -->|claude| C["~/.claude/skills/zettelkasten/<br/>or a Claude Code plugin"]
+  Q -->|copilot| P["~/.copilot/skills/zettelkasten/<br/>or DIR/.github/skills/zettelkasten/"]
+  Q -->|hermes| H["~/.hermes/skills/research/zettelkasten/"]
 ```
 
 **Start with `--dry-run`.** It names the destination, counts what would be written, backed up and
@@ -94,6 +126,21 @@ defaults** — if your schema says two link verbs, the agent uses two.
 ### 2. Ingest a source
 
 > **You:** Ingest `~/Downloads/spacing-and-the-forgetting-curve.md`
+
+The whole contract is the gate in the middle. Nothing reaches `permanent/` until you have seen
+what it intends to write and said yes:
+
+```mermaid
+flowchart TD
+  S["you point it at a source"] --> CAP["capture it into raw/<br/>with a sha256"]
+  CAP --> SEA["search the vault for notes<br/>already on the same idea"]
+  SEA --> PLAN["show you a plan —<br/>notes, titles, links, verbs"]
+  PLAN --> ASK{"you approve?"}
+  ASK -->|"no — too broad, not worth having"| REV["revise the plan"]
+  REV --> PLAN
+  ASK -->|"yes"| W["write the notes, link them<br/>both ways, update index and log"]
+  W --> L["run the linter and<br/>report what changed"]
+```
 
 It reads the source, searches the vault for anything already covering the same ground, then shows
 you a plan. A real one, from a run of this skill, lightly trimmed for length:
