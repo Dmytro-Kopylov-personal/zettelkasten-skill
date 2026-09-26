@@ -36,8 +36,8 @@ Don't use for:
 
 **Resolve the vault path before touching anything** — from the request, from the
 `ZETTELKASTEN_VAULT_PATH` environment variable, or by looking upward from the working directory for
-a folder holding both `SCHEMA.md` and `permanent/`. If none of those resolves it, ask. Do not guess
-and do not write into a folder you have not confirmed is a vault.
+a folder holding all three of `SCHEMA.md`, `permanent/` and `log.md`. If none of those resolves it,
+ask. Do not guess and do not write into a folder you have not confirmed is a vault.
 
 **Deterministic checks may be unavailable.** On a locked-down machine you may not be able to run the
 bundled Python linter. Run it when you can:
@@ -59,8 +59,8 @@ Stop at the first step that resolves:
 
 1. A path the user gave in the request.
 2. The `ZETTELKASTEN_VAULT_PATH` environment variable.
-3. Walk upward from the working directory for a folder containing **both** `SCHEMA.md` and
-   `permanent/`.
+3. Walk upward from the working directory for a folder containing all three of `SCHEMA.md`,
+   `permanent/` and `log.md`.
 4. Ask. Never guess, and never run a write operation against a vault you have not confirmed.
 
 If any of `permanent/`, `SCHEMA.md` or `log.md` is missing, the folder is not a vault. Say so and
@@ -177,7 +177,7 @@ One source at a time; batch only when the user hands over several at once.
    `structure/concept-table.md`.
 8. **Log** the operation, then report every file created or updated.
 
-A single source touching five to fifteen notes is normal, and is the compounding effect working.
+A single source typically yields three to eight notes; a long article about one idea may yield one.
 If a source would touch more than ten existing notes, confirm the scope before writing anything.
 
 ## Query

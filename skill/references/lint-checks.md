@@ -171,9 +171,9 @@ and filename from the moment you actually split them. The evidence line names bo
 **Severity:** error
 
 **Fires when** a frontmatter link target, or a `[[wikilink]]` in the body, does not resolve
-to any note. One finding per target, not per mention: a broken target is broken in the
-frontmatter and in the body's Links section, and counting it twice would inflate the total
-for a single defect.
+to any note. One finding per (note, target), not per mention: a broken target appears in the
+frontmatter and again in the body's Links section by design, and may be named several times
+in the prose besides; counting each would inflate the total for a single defect.
 
 **Fix:** create the note, or point the link at the note that does exist. A link to a note you
 *intend* to write is a note you have not written.
@@ -377,14 +377,15 @@ at some point.
 
 **Severity:** info
 
-**Fires when** the body exceeds `oversized_note_words` (default 800). Word count only, code
-fences included.
+**Fires when** the body exceeds `oversized_note_words` (default 800). Word count only, and
+code fences and inline code are blanked before counting — a note that is mostly a listing is
+not a long note.
 
 **Fix:** length alone is not a defect — some ideas are long. Check whether it holds one idea,
 or several wearing one title. The better signal for splitting is ZK030, which looks at the
 shape rather than the size.
 
-**By hand:** count the words, then read the note and ask what its title promises.
+**By hand:** count the prose words, then read the note and ask what its title promises.
 
 <a id="zk024"></a>
 ### ZK024 — a paragraph carries no provenance

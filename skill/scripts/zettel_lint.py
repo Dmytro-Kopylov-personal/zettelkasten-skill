@@ -482,6 +482,7 @@ def parse_file(data: bytes) -> ParsedFile:
 WIKILINK_RE = re.compile(r"\[\[([^\[\]]+)\]\]")
 PROVENANCE_RE = re.compile(r"\^\[([^\]]+)\]")
 FENCE_RE = re.compile(r"^\s{0,3}(```|~~~)")
+ORDERED_ITEM_RE = re.compile(r"^\d+[.)]\s")
 
 
 def strip_code(text: str) -> str:
@@ -805,6 +806,7 @@ def _top_level_paragraphs(body: str) -> list[tuple[int, str]]:
             not text
             or text.startswith(("#", ">", "|", "-", "*", "+"))
             or text.startswith("```")
+            or ORDERED_ITEM_RE.match(text) is not None
         )
         if skip:
             if current:
@@ -1143,6 +1145,7 @@ def check_broken_links(vault: Vault, config: dict, now: dt.date) -> list[Finding
         for target, line in note.links:
             if target in reported or _resolve(vault, target):
                 continue
+            reported.add(target)
             findings.append(
                 Finding(
                     code="ZK008",
@@ -1225,7 +1228,7 @@ def check_orphans(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
     inbound = inbound_counts(vault)
     findings = []
     for note in vault.notes:
-        if note.frontmatter is None or note.slug in ("index",):
+        if note.frontmatter is None:
             continue
         if inbound.get(note.relpath, 0) == 0:
             findings.append(
@@ -2067,9 +2070,10 @@ def render_text(document: dict) -> str:
 
     summary = document["summary"]
     metrics = summary["metrics"]
+    raw_sources = metrics["raw_sources"]
     lines.append(
-        f"{metrics['notes']} notes, {metrics['raw_sources']} raw sources, {metrics['links']} links, "
-        f"orphan rate {metrics['orphan_rate']:.0%}"
+        f"{metrics['notes']} notes, {raw_sources} raw source{'' if raw_sources == 1 else 's'}, "
+        f"{metrics['links']} links, orphan rate {metrics['orphan_rate']:.0%}"
     )
     if summary["baselined"]:
         lines.append(f"{summary['baselined']} finding(s) suppressed by the baseline")
@@ -2249,7 +2253,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
-
-if __name__ == "__main__":
-    raise SystemExit(main_with_subcommands())

@@ -25,6 +25,7 @@ enforceable if something other than the agent's judgment checks them.
 | V8 | **A grader can pass without the skill, and the ablation still looks clean.** Both P6 cases scored 1.00 with and below threshold without — but reading the kept run trees, each delta rests on exactly one grader, and that grader tests a *naming convention*: `vault/permanent/*.md` in one case, `zettelkasten/SCHEMA.md` in the other. With no skill loaded, the agent still indexed, still logged, still linked seven notes, and still contained itself to a single folder. | The flags-nothing failure one layer up: not a check that cannot fail, but a check that cannot *discriminate*. An ablation whose baseline arm scores 0.67–0.75 is mostly measuring the prompt. Cases must carry at least one grader whose answer depends on something only the body supplies — an id↔filename match, a `sha256` on the captured source, a verb from the closed set, a `sources:` field — none of which a plausible-looking unskilled vault has. Recorded in `docs/results.md` with the run trees that show it. |
 | V9 | **The loader and the validator disagree in both directions, and a skill with no `description` does not load at all.** Measured from the loader's own init event: a `SKILL.md` at the plugin root loads, with or without a `skills` key, and so does a directory named by `skills` — the two layouts `validate` never inspects. The loader is stricter in exactly one place, holding every other variable constant: the same directory with the same `name` loads when a description is present and vanishes from the `skills` array when it is absent, at the root and in a declared directory alike. | The V2 discovery surface has a second failure mode on a different platform, and a louder one — not a truncated trigger string, but no skill at all. Every render already requires a non-empty description and the frontmatter conformance suite asserts it per platform, so nothing changes; recorded because the reason is now known rather than assumed, and because it is the one loader rule stricter than the validator beside it. |
 | V10 | **`permanent/glob("*.md")` was not recursive while `raw/rglob` and `inbox/rglob` were, so a note one directory deep was invisible.** `load_vault` collected it as nothing, `summary.notes` read 0, no check had anything to fire on, and the run exited 0 — "0 notes, no findings", which reads as a clean vault. Obsidian users file notes into subdirectories as a matter of course, and the miss is the one failure mode this repository exists to catch: a report of success that is indistinguishable from the absence of a report. | `permanent/` now recurses, and `structure/` deliberately does not — its files have fixed names and fixed roles, so nesting has no meaning to give one, and recursion there bought nothing while making a nested `index.md` a candidate for *the* index. Link resolution moved from string comparison to `Vault.resolve()`, which accepts every spelling Obsidian writes (`note`, `note.md`, `sub/note`, `permanent/sub/note`) and returns the *note*; the inbound count keys on that note rather than on the string, or a long-form link would have produced a false orphan in both ZK011 and the reported orphan rate. `vault_nested` calibrates all four mutations, one of which found that the `.md` branch had been unexercised in both the old code and the new. |
+
 ## Assembly: seams, not forks
 
 `src/SKILL.template.md` is the document minus two seams — `{{FRONTMATTER}}` and
@@ -136,11 +137,14 @@ identical from the inside.
 
 ## Open caveats
 
-- **`related_skills: [obsidian, llm-wiki, start-investigation]`** resolve on this machine
-  but are user-local, so they dangle in a fresh clone. Shipped as specified, recorded here.
-- **Copilot cannot be fully verified here.** Copilot CLI 1.0.88 is installed and its
-  `/skills list` is checkable; VS Code and the cloud agent are not, and no claim will be
-  made about them beyond what was actually exercised.
+- **`related_skills` was dropped rather than shipped.** The spec's
+  `[obsidian, llm-wiki, start-investigation]` name three skills that exist on this machine and
+  nowhere else, so a public clone would carry metadata pointing at nothing. No test asserted the
+  field and Hermes' validator does not require it, so it went and the goldens were regenerated
+  without it. Recorded because the spec still asks for it.
+- **Copilot cannot be fully verified here.** Copilot CLI 1.0.88 is installed and `copilot skill
+  list` is checkable; VS Code and the cloud agent are not, and no claim will be made about them
+  beyond what was actually exercised.
 - **If this skill is ever pointed at the notes vault**, its root `inbox/` collides
   conceptually with the `obsidian` skill's `investigations/{inbox,active,archived}/`, which
   states the user owns triage transitions. Two inboxes with different rules in one vault is
@@ -148,5 +152,7 @@ identical from the inside.
   project-shaped, not atomic-note-shaped.
 - **A loaded skill is not a followed skill.** Mitigations are real but partial: hard gates
   lead the body, the body is ~250 lines rather than the 500 allowed, and lint makes drift
-  detectable after the fact. The N=3 scripted-ingest pass rate is the only honest evidence,
-  and it is not measured yet.
+  detectable after the fact. The only honest evidence is the N=3 scripted ingest, which passed
+  3/3 with variance confined to the notes produced (5, 5, 6) rather than to whether the protocol
+  was followed — the runs are in `docs/results.md`. Three runs is a small sample, and the
+  ablation beside it cannot supply a variance figure at all (finding V8).

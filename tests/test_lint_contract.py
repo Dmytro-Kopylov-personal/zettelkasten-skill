@@ -38,6 +38,8 @@ FIXTURE_NAMES = [
     "vault_trap",
     "vault_hostile",
     "vault_monoculture",
+    "vault_nested",
+    "vault_regressions",
     "not_a_vault",
 ]
 

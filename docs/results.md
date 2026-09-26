@@ -2,6 +2,65 @@
 
 Measurements, appended as phases complete. A phase's gate is met here or it is not met.
 
+## The release pass (2026-09-26)
+
+The question was whether the repo was clean enough to publish, and the honest answer was no: the
+documentation review turned up three defects in the linter and one published claim the evidence
+contradicted. All three had shipped in v1.0.1 and all three passed the whole suite.
+
+**A broken link was reported twice.** The body's `## Links` section restates the frontmatter by
+design, and both loops that walk those sources share a `reported` set so that a pair of mentions
+yields one finding. The frontmatter loop never populated it, which made the body loop's guard
+dead code: every broken link counted twice, and the report's total was meaningless. The fix is
+the one missing `reported.add(target)` — it makes the guard that was already written live. Two
+notes in `vault_regressions` calibrate it, because there are two loops and the same hole was in
+both: `202609281001` names its broken target in the frontmatter and again in `## Links`, and
+`202609281005` names a body-only target twice in one Links section. The second shape is the
+reason the target is absent from that note's frontmatter — with it there, the first loop
+populates `reported` and the second loop's hole stays hidden, which is what defeated the first
+attempt at this fixture.
+
+**An ordered list item was read as prose.** `ZK024` judges top-level paragraphs ≥25 words with no
+provenance marker, and its skip list covered headings, quotes, tables and bullets but not numbered
+items — so step 1 of a procedure was told to cite a source for itself. The false positive that
+gets a check switched off. `ORDERED_ITEM_RE` joins the skip tuple, and the fixture is a pair:
+`202609281002` (three sources, one 40-word ordered step) must stay silent, `202609281003` (three
+sources, one 35-word unmarked paragraph) must fire. Absence alone cannot distinguish a check that
+was fixed from one that stopped firing, so the positive control is the test and the negative
+control is only half of it.
+
+**A note filed as `index.md` was exempt from the orphan check.** `slug` is the filename stem and
+`structure/` is loaded into `vault.structure`, never into `vault.notes`, so `note.slug in
+("index",)` could never match the vault's real index — it matched only a *note* the user had filed
+as `permanent/index.md`. A hand-kept list of one's own notes is precisely the file that receives
+no inbound links, so the exemption silently suppressed one orphan per vault, and did it
+inconsistently: `ZK006` reported the same note the whole time. `permanent/index.md` in
+`vault_regressions` now carries both codes, and restoring the exemption makes the `ZK011` vanish.
+Also removed: a second `if __name__ == "__main__"` block stranded after a `raise SystemExit`,
+unreachable and calling a symbol that does not exist.
+
+**Why no test caught any of them — the structural finding.** `vault_defects` carries `ZK008`,
+`ZK011` and `ZK024` in their plain form, which proves each check *can* fire and says nothing about
+how many times it fires or on which notes. Every fixture in the corpus had one shape per defect,
+and a count is only calibrated by a second shape. `vault_regressions` exists for that gap: each of
+its three traps was verified by reintroducing the original code and watching the finding set move
+— ZK008 2 → 3, ZK011 present → absent, ZK024 1 → 2. A regression fixture that passes with the bug
+restored is decoration, so the mutation is recorded with each trap in its `MANIFEST.md` rather than
+assumed.
+
+**A published claim the evidence contradicted.** `GETTING-STARTED.md` said its linter output came
+from a session with **no shell**, which was offered as the reason the digest was missing. The
+output cannot have come from such a session: it contains `NOT RUN: ZK016 (not applicable: SCHEMA.md
+declares no tag taxonomy)` and `4 notes, 1 raw source, 8 links, orphan rate 0%`, and the strings
+`declares no tag taxonomy` and `orphan rate` occur nowhere in the repo outside
+`zettel_lint.py` — while `no note cites 3 or more sources` and `only 8 links` occur nowhere at all,
+because they are composed at runtime from vault-specific numbers. The block is the linter's own
+output, which requires a shell. The claim was removed from both the guide and the commit it came
+from; the observation the paragraph actually wanted — that a missing digest is reported rather
+than passed over — is true of that output and is now what it says.
+
+**Suite after the pass:** 556 passed, 0 skipped. `make check` green for all three platforms.
+
 ## After v1.0.0 — the Obsidian pass (2026-09-26)
 
 The question was whether the approach could be made Obsidian-compatible, and the answer was

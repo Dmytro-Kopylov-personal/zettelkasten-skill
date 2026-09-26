@@ -2,8 +2,8 @@
 
 **Resolve the vault path before touching anything** — from the request, from the
 `ZETTELKASTEN_VAULT_PATH` environment variable, or by looking upward from the working directory for
-a folder holding both `SCHEMA.md` and `permanent/`. If none of those resolves it, ask. Do not guess
-and do not write into a folder you have not confirmed is a vault.
+a folder holding all three of `SCHEMA.md`, `permanent/` and `log.md`. If none of those resolves it,
+ask. Do not guess and do not write into a folder you have not confirmed is a vault.
 
 **Deterministic checks may be unavailable.** On a locked-down machine you may not be able to run the
 bundled Python linter. Run it when you can:

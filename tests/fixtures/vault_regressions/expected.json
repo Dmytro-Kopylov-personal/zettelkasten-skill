@@ -1,0 +1,14 @@
+{
+  "_comment": "Three shipped fixes, each pinned by an input that fails when the bug comes back. ZK008 appears twice because there are two dedupe loops with the same hole: one note names its broken target in the frontmatter and again in ## Links, the other names a body-only target twice in one Links section. ZK011 and ZK006 both land on permanent/index.md, which is a note the orphan check used to skip by filename while the filename check still reported it. ZK024 fires on the note with a real unmarked paragraph and stays silent on the note whose long line is a numbered list item, so the fix is calibrated in both directions rather than by absence.",
+  "exit": {"error": 1, "warn": 1, "info": 1},
+  "metrics": {"notes": 5, "raw_sources": 3, "links": 12, "orphan_rate": 0.2},
+  "not_applicable": ["ZK016", "ZK029", "ZK031"],
+  "findings": [
+    ["ZK006", "permanent/index.md", "index"],
+    ["ZK008", "permanent/202609281001-question-the-method.md", "202609289999-retracted-claim"],
+    ["ZK008", "permanent/202609281005-hand-edited-links.md", "202609289998-also-missing"],
+    ["ZK011", "permanent/index.md", "index"],
+    ["ZK024", "permanent/202609281003-unmarked-claim.md", "202609281003-unmarked-claim"],
+    ["ZK028", "permanent/202609281005-hand-edited-links.md", "202609281005-hand-edited-links"]
+  ]
+}

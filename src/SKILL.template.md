@@ -37,8 +37,8 @@ Stop at the first step that resolves:
 
 1. A path the user gave in the request.
 2. The `ZETTELKASTEN_VAULT_PATH` environment variable.
-3. Walk upward from the working directory for a folder containing **both** `SCHEMA.md` and
-   `permanent/`.
+3. Walk upward from the working directory for a folder containing all three of `SCHEMA.md`,
+   `permanent/` and `log.md`.
 4. Ask. Never guess, and never run a write operation against a vault you have not confirmed.
 
 If any of `permanent/`, `SCHEMA.md` or `log.md` is missing, the folder is not a vault. Say so and
@@ -155,7 +155,7 @@ One source at a time; batch only when the user hands over several at once.
    `structure/concept-table.md`.
 8. **Log** the operation, then report every file created or updated.
 
-A single source touching five to fifteen notes is normal, and is the compounding effect working.
+A single source typically yields three to eight notes; a long article about one idea may yield one.
 If a source would touch more than ten existing notes, confirm the scope before writing anything.
 
 ## Query

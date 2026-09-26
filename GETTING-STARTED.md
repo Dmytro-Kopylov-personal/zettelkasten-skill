@@ -37,10 +37,10 @@ Skip to [Your first vault](#your-first-vault) once it is in.
 ./install.sh --platform hermes --force     # ~/.hermes/skills/research/zettelkasten/
 ```
 
-**Start with `--dry-run`.** It prints every path it would touch and writes nothing at all — not
-one file, not even its bookkeeping manifest. On a first install it needs `--force` alongside it,
-which there only permits *looking* at a skills directory that does not exist yet. Drop both
-flags to install for real.
+**Start with `--dry-run`.** It names the destination, counts what would be written, backed up and
+left alone, and writes nothing at all — not one file, not even its bookkeeping manifest. On a first
+install it needs `--force` alongside it, which there only permits *looking* at a skills directory
+that does not exist yet. Drop `--dry-run` to install for real; keep `--force` for that first run.
 
 **`--force` is required the first time**, because the platform's skills directory usually does not
 exist until the agent has run at least once, and the installer refuses to invent one — a missing
@@ -80,8 +80,11 @@ zettelkasten/
 ├── SCHEMA.md          the vault's own conventions — domain, tags, thresholds
 ├── log.md             one line per operation, oldest first
 ├── raw/               sources, captured and never edited again
+│   ├── articles/
+│   ├── papers/
+│   └── notes/
 ├── permanent/         the notes
-├── structure/         index.md, and a concept table as the vault grows
+├── structure/         index.md, concept-table.md, overview.md
 └── inbox/             quick captures awaiting triage
 ```
 
@@ -147,7 +150,7 @@ error: 1
         subject: sha256
         action:  run `zettel_lint.py hash <file>` and record the digest
 
-4 notes, 1 raw sources, 8 links, orphan rate 0%
+4 notes, 1 raw source, 8 links, orphan rate 0%
 NOT RUN: ZK016 (not applicable: SCHEMA.md declares no tag taxonomy)
 NOT RUN: ZK024 (not applicable: no note cites 3 or more sources)
 NOT RUN: ZK027 (not applicable: no note uses the 'contradicts' verb)
@@ -155,9 +158,10 @@ NOT RUN: ZK029 (not applicable: only 8 links; the check needs 20)
 NOT RUN: ZK031 (not applicable: the inbox is empty)
 ```
 
-That output is real, from a session that had **no shell** — so the digest genuinely could not be
-computed, and the linter says so instead of reporting a clean vault. That is the design: a check
-that cannot run is reported as not-run, never as a pass.
+The single `error` is the point. Nothing had computed the digest, so rather than passing the file
+the linter says so — and the five `NOT RUN` lines name the checks this vault is too small to
+exercise, instead of letting their silence read as a pass. That is the design: a check that cannot
+run is reported as not-run, never as a pass.
 
 The linter **never edits anything**. It reports; the agent proposes a fix; you approve.
 
@@ -170,7 +174,7 @@ is reflowed to fit this page:
 
 ```markdown
 ---
-id: 202609261202
+id: "202609261202"
 title: Testing changes the knowledge it measures
 type: permanent
 status: seed
@@ -225,8 +229,9 @@ A folder of beautifully written unlinked notes is a pile, and the linter will sa
 
 Some environments ship an agent with no way to run a command. The skill degrades rather than
 breaking: `references/tool-free-fallback.md` gives a manual procedure for every check, and requires
-the agent to **name the checks it could not perform** rather than implying a clean vault. The run
-quoted above did exactly that — it found the missing digest and reported it, without a shell.
+the agent to **name the checks it could not perform** rather than implying a clean vault. The
+`NOT RUN` lines above are the same obligation where the linter *does* run: coverage is stated, so
+silence is never mistaken for a pass.
 
 ## Going deeper
 
@@ -236,12 +241,13 @@ quoted above did exactly that — it found the missing digest and reported it, w
 | `skill/references/schema-reference.md` | `SCHEMA.md`, the six verbs, thresholds, the Page Threshold |
 | `skill/references/lint-checks.md` | all 32 checks: predicate, remediation, and a manual-scan line |
 | `skill/references/tool-free-fallback.md` | what to do with no shell |
+| `docs/architecture.md` | how it is shaped, and where the three platforms pull apart — diagrams |
 | `docs/design.md` | why it is built this way, including what went wrong on the way |
 | `docs/results.md` | what has actually been measured, and what has not |
 
 ## A note on trust
 
-Everything in this repo is backed by something that ran. Where a platform's behaviour could not be
-verified — Copilot's VS Code extension, the Copilot cloud agent — the README says so outright
-rather than leaving you to find out. The measurements carry the same markers, including where the
-skill's own evaluation turned out to be weaker than it looked (`docs/results.md`, finding V8).
+Every claim in this repo is backed by something checkable, and the README names what was *not*
+verified — Copilot's VS Code extension, the Copilot cloud agent — rather than leaving you to find
+out. The measurements carry the same markers, including where the skill's own evaluation turned out
+to be weaker than it looked (`docs/design.md`, finding V8; the run trees are in `docs/results.md`).
