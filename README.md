@@ -50,11 +50,10 @@ byte-exact oracle `--check` diffs against. One copy, two jobs, no drift.
 ```bash
 git clone https://github.com/Dmytro-Kopylov-personal/zettelkasten-skill.git
 cd zettelkasten-skill
-
-./install.sh --platform claude --force  # detect the root if you leave --platform out
-./install.sh --platform copilot --project-root /path/to/repo
-./install.sh --platform hermes --dry-run
+./install.sh --platform claude --force   # or copilot, or hermes — omit --platform to detect
 ```
+
+Add `--dry-run` to see what it would write without writing anything.
 
 It renders, validates, then copies `SKILL.md`, `references/`, `templates/` and `scripts/`
 into the platform's skills tree. Re-running it is a no-op; a file it did not write is
@@ -65,9 +64,10 @@ an OS-level backup cannot carry it into a vault.
 
 Exit codes: 0 ok · 1 render failure · 2 usage · 3 platform not detected · 4 unmanaged file.
 
-A skills root that does not exist yet needs `--force`, which creates it. That is the only
-thing `--force` does — it never overrides a refusal, because the remedy for an unmanaged file
-is a person moving it, not a flag.
+**`--force` is needed on a first install**, because the platform's skills directory usually does
+not exist until the agent has run once, and the installer will not invent one — a missing root
+may mean the platform is not installed. `--force` creates that one directory and nothing else.
+It never overrides a refusal: the remedy for an unmanaged file is a person moving it, not a flag.
 
 Copilot has two locations, and they are different scopes:
 
