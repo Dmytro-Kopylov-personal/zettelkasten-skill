@@ -50,10 +50,15 @@ byte-exact oracle `--check` diffs against. One copy, two jobs, no drift.
 ```bash
 git clone https://github.com/Dmytro-Kopylov-personal/zettelkasten-skill.git
 cd zettelkasten-skill
-./install.sh --platform claude --force   # or copilot, or hermes — omit --platform to detect
+
+./install.sh --platform claude --dry-run --force   # see what it would write, writing nothing
+./install.sh --platform claude --force             # then for real; or copilot, or hermes
 ```
 
-Add `--dry-run` to see what it would write without writing anything.
+**Start with `--dry-run`.** It prints every path it would touch and writes nothing — not one
+file, not even its bookkeeping manifest. On a first install it needs `--force` as well, which
+there only permits *looking* at a skills directory that does not exist yet. Omit `--platform`
+to detect what you have.
 
 It renders, validates, then copies `SKILL.md`, `references/`, `templates/` and `scripts/`
 into the platform's skills tree. Re-running it is a no-op; a file it did not write is
