@@ -48,9 +48,12 @@ byte-exact oracle `--check` diffs against. One copy, two jobs, no drift.
 ## Install
 
 ```bash
-./install.sh --platform hermes          # detect the root if you leave --platform out
+git clone https://github.com/Dmytro-Kopylov-personal/zettelkasten-skill.git
+cd zettelkasten-skill
+
+./install.sh --platform claude --force  # detect the root if you leave --platform out
 ./install.sh --platform copilot --project-root /path/to/repo
-./install.sh --platform claude --dry-run
+./install.sh --platform hermes --dry-run
 ```
 
 It renders, validates, then copies `SKILL.md`, `references/`, `templates/` and `scripts/`
