@@ -96,9 +96,9 @@ half worth failing CI on.
 
 ## Verification
 
-Every instrument gets a known-answer calibration **in both directions**, the lesson from
-`fly-arena`: a screen that flags everything and one that flags nothing look identical from
-the inside.
+Every instrument gets a known-answer calibration **in both directions**, the lesson from an
+earlier project of mine: a screen that flags everything and one that flags nothing look
+identical from the inside.
 
 - Fixtures ship a `MANIFEST.md` enumerating by hand which defect each file carries, written
   *before* the linter runs, plus `expected.json`. `vault_defects` asserts **set equality**,

@@ -1,0 +1,35 @@
+name: CI
+
+# What this does and does not cover.
+#
+# `make check` and `make test` are the two gates the repo claims: the renders are byte-identical
+# to their goldens, and the suite passes. Both run with no model, no network and no writes
+# outside the runner's tmp.
+#
+# NOT run here: `make eval-lint` and `make eval-claude`. The first needs the `claude` CLI and a
+# rendered `skill/SKILL.md`; the second calls a model and costs money, so it stays a deliberate
+# local act. The platform acceptance runs live in tests/acceptance/ for the same reason.
+#
+# Tests that load a platform's own validator (`_validate_frontmatter`, `quick_validate.py`)
+# find nothing on a bare runner and **skip with a reason**, which is their designed behaviour —
+# they are never stubbed, so a green CI here does not claim they ran.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Renders match their goldens
+        run: make check
+
+      - name: Suite
+        run: make test

@@ -3,9 +3,9 @@
 A portable agent skill that turns an agent into a **Zettelkasten maintainer**: raw sources
 compile into atomic, densely-linked, provenance-carrying permanent notes.
 
-One capability, three platforms — [Hermes](https://github.com/) (primary),
-Claude Code, and GitHub Copilot — assembled from a shared body plus a thin
-per-platform seam, so the same skill behaves the same way wherever it runs.
+One capability, three platforms — Hermes, Claude Code, and GitHub Copilot — assembled from a
+shared body plus a thin per-platform seam, so the same skill behaves the same way wherever it
+runs.
 
 ## What it does
 
@@ -74,6 +74,12 @@ Install **one** personal copy per machine. Copilot's own help text also lists a 
 `.claude/skills/` among the sources it reads, so a repo already carrying the Claude render
 might not need a second copy — untested here, and `copilot skill list` answers it before you
 install twice.
+
+Copilot CLI can also take a URL — `copilot skill add <https://…/SKILL.md>` — and **that path
+gives you a broken install.** It fetches a single `SKILL.md` and materialises nothing else, so
+the skill would load with its `references/`, `scripts/` and `templates/` all missing: a body
+that tells the agent to read files that are not there, and a linter that does not exist. Use
+`install.sh`, or clone the repo and point `copilot skill add` at the directory instead.
 
 Verified after installing: `copilot skill list` prints the skill under *Personal skills* with
 its description untruncated, discovered from `~/.copilot/skills/`. **Unverified:** the VS Code
