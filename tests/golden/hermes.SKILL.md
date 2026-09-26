@@ -1,7 +1,7 @@
 ---
 name: zettelkasten
 description: 'Ingest, query, lint and init a Zettelkasten vault. Use when the user drops a source, asks a question of their notes, or says lint, audit or health-check.'
-version: 1.0.1
+version: 1.0.2
 author: Dmytro Kopylov
 license: MIT
 platforms: [linux, macos, windows]
