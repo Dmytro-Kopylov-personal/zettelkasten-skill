@@ -30,6 +30,7 @@ The check count was an estimate when the three tiers were sketched; the registry
 | Linter | `scripts/zettel_lint.py` — stdlib only, single file, no venv, no pip, read-only. Prompt-only fallback documented for machines that cannot run scripts. |
 | Operations | Four: `init`, `ingest`, `query`, `lint`. `init` resolves the specification's ambiguity about where `SCHEMA.md` lives by shipping `templates/SCHEMA.md` and materialising a per-vault copy. |
 | Tool names | Never in the shared body; assembled per platform at install time. Enforced mechanically. |
+| Blast radius | A vault is a **folder of its own** — `init` creates `zettelkasten/` rather than adopting the directory it runs in — and the body states the vault root as the only place the skill writes. Ingest updates existing notes by design, so a vault sharing a directory with other work would edit files it never created. Structural where it can be (the walk-up then cannot mistake a repo for a vault) and stated in the pitfall *and* the checklist where it has to be discipline. |
 
 ## Risks
 

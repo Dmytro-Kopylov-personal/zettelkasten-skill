@@ -20,6 +20,12 @@ The difference from a wiki is atomicity: a wiki has a page per *thing*, a Zettel
 a note per *idea*, and the value lives in the links. The skill's central rule is that an
 ingest **proposes before it writes** — the user approves, the agent compiles.
 
+A vault is also a **folder of its own**. `init` creates `zettelkasten/` rather than adopting
+the directory it runs in, and the vault root is the only place the skill writes. Ingest is
+designed to *update* existing notes, so a vault sharing a directory with other work would
+edit files it never created; keeping the vault self-contained makes that impossible rather
+than merely discouraged.
+
 ## Layout
 
 ```
@@ -125,7 +131,7 @@ requiring exactly that check's findings to disappear.
 
 ## Status
 
-The render layer, the linter and the installer are complete and green (516 tests). Hermes is
+The render layer, the linter and the installer are complete and green (518 tests). Hermes is
 accepted: installed, listed, pinned, its catalog line verified against a live session's
 system prompt, and a three-run scripted ingest **3/3** with zero findings from every vault
 (`docs/results.md`). Claude and Copilot acceptance are outstanding. `docs/plan.md` carries
