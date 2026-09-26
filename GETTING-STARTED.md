@@ -14,15 +14,21 @@ it intends to create before any file appears.
 
 ## Install
 
-The skill is one directory — `SKILL.md` plus `references/`, `templates/` and `scripts/` — copied
-into wherever your agent looks for skills. Clone the repo and let the installer place it.
+The skill is one directory — `SKILL.md` plus `references/`, `templates/` and `scripts/` —
+placed wherever your agent looks for skills.
+
+**On Claude Code**, install it as a plugin:
 
 ```bash
-git clone https://github.com/Dmytro-Kopylov-personal/zettelkasten-skill.git
-cd zettelkasten-skill
+claude plugin marketplace add Dmytro-Kopylov-personal/zettelkasten-skill
+claude plugin install zettelkasten@zettelkasten-skill
 ```
 
-Then pick your platform:
+In a session those are `/plugin marketplace add` and `/plugin install`. This is the tidy path: it
+keeps the skill in Claude Code's own plugin store, where updating and removing it are one command.
+Skip to [Your first vault](#your-first-vault) once it is in.
+
+**On Claude Code, Copilot or Hermes**, clone the repo and let the installer place it:
 
 ```bash
 ./install.sh --platform claude --dry-run --force   # see what it would write, writing nothing

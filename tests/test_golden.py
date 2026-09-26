@@ -7,6 +7,8 @@ and why the shared-body invariant below reads from it rather than from the templ
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from conftest import GOLDEN, REPO, strip_seams
 from support import platform_rules
@@ -221,3 +223,69 @@ def test_the_adopted_golden_is_the_one_check_then_accepts(tmp_path, monkeypatch)
     monkeypatch.setattr(render, "GOLDEN", tmp_path)
     assert render.main(["--update-goldens"]) == 0
     assert render.main(["--check"]) == 0
+
+
+# --- the Claude Code plugin payload ---------------------------------------------------
+#
+# This repo is also a Claude Code plugin, so `skill/SKILL.md` is committed: a plugin whose
+# SKILL.md is gitignored installs as zero skills, silently. That puts a second copy of a
+# render back into the tree, which is the thing the golden-as-single-oracle design exists to
+# avoid — so the copy is not left to discipline. It is asserted byte-identical to the golden
+# it came from, and the manifest is asserted to point at where the skill actually is.
+
+
+def plugin_manifest() -> dict:
+    return json.loads((REPO / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+
+
+def marketplace_manifest() -> dict:
+    return json.loads(
+        (REPO / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8")
+    )
+
+
+def test_the_plugin_payload_is_the_claude_golden_byte_for_byte():
+    """The only reason this file is committed is that a plugin must ship one."""
+    assert (REPO / "skill" / "SKILL.md").read_text(encoding="utf-8") == golden("claude")
+
+
+def test_the_plugin_points_at_a_directory_that_really_holds_the_skill():
+    """V7: `claude plugin validate` never opens a path named by `skills`, so a wrong value
+    here passes validation and installs nothing. Resolve it instead of trusting it."""
+    declared = plugin_manifest()["skills"]
+    assert declared, "no skills declared — the default skills/ directory does not exist here"
+    for entry in declared:
+        # A bare "skill" is a load failure, not a style preference.
+        assert entry.startswith("./"), f"{entry!r} is not ./-relative"
+        target = (REPO / entry).resolve()
+        assert (target / "SKILL.md").is_file(), f"{entry!r} holds no SKILL.md"
+
+
+def test_every_declared_skill_would_actually_load():
+    """V9: a skill with no description does not load at all — the plugin registers and the
+    skill is simply absent from the loader's array."""
+    for entry in plugin_manifest()["skills"]:
+        text = ((REPO / entry).resolve() / "SKILL.md").read_text(encoding="utf-8")
+        doc = platform_rules.parse(text)
+        assert platform_rules.description(doc).strip(), f"{entry}: empty description, will not load"
+        assert render.validate("claude", text) == [], f"{entry} fails the claude contract"
+
+
+def test_the_marketplace_entry_resolves_to_the_plugin_root():
+    """`/plugin install <plugin>@<marketplace>` needs both names; the source must resolve."""
+    plugin, market = plugin_manifest(), marketplace_manifest()
+    assert market["name"], "a marketplace install is addressed by this name"
+    entries = [p for p in market["plugins"] if p["name"] == plugin["name"]]
+    assert len(entries) == 1, f"expected exactly one entry named {plugin['name']!r}"
+    source = entries[0]["source"]
+    assert source.startswith("./"), f"{source!r} is not ./-relative"
+    assert (REPO / source).resolve() == REPO, "the entry does not point at this plugin"
+    assert (REPO / source / ".claude-plugin" / "plugin.json").is_file()
+
+
+def test_the_marketplace_entry_does_not_silently_disagree_about_the_version():
+    """plugin.json wins at install time, so an entry version that differs is ignored rather
+    than reported — the divergence this asserts against."""
+    plugin, market = plugin_manifest(), marketplace_manifest()
+    entry = next(p for p in market["plugins"] if p["name"] == plugin["name"])
+    assert entry.get("version", plugin["version"]) == plugin["version"]

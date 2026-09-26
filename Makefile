@@ -3,10 +3,13 @@
 UV := uv run --with pytest --with pyyaml
 
 #: The eval target is the repo's `skill/` directory, so it needs a render in place first.
-#: `skill/SKILL.md` is gitignored precisely because it is a build artifact.
+#: `skill/SKILL.md` is committed: this repo is also a Claude Code plugin, and a plugin whose
+#: SKILL.md is gitignored installs as zero skills. This rule stays the thing that regenerates
+#: it, and test_golden.py fails if the committed copy drifts from tests/golden/claude.SKILL.md.
 SKILL_MD := skill/SKILL.md
 
-# `claude plugin eval` needs a resolvable skill, and `skill/` has no SKILL.md until rendered.
+# A no-op in a clean clone. Still the rule that writes the file, so it is spelled out rather
+# than assumed: it always renders `claude`, which is why the committed copy is the Claude one.
 $(SKILL_MD): src/SKILL.template.md src/fragments/frontmatter.claude.yaml src/fragments/environment.claude.md
 	python3 src/render.py --platform claude --out dist
 	cp dist/claude/SKILL.md $(SKILL_MD)

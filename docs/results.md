@@ -75,6 +75,24 @@ not, at the plugin root and in a declared directory alike. Every render already 
 non-empty description, so nothing changed here; it is recorded because the reason is now known
 rather than assumed.
 
+**The plugin install path, verified end to end (P6b).** The repo now ships
+`.claude-plugin/plugin.json` and `marketplace.json`, so Claude Code can install it the idiomatic
+way rather than by cloning. Exercised in an isolated `CLAUDE_CONFIG_DIR` so the user's own plugin
+state was never touched — confirmed isolated by the real config's `rust-analyzer-lsp` being
+absent from the run: `marketplace add` → `install zettelkasten@zettelkasten-skill` →
+`plugin details` reporting *Skills (1) zettelkasten* → a headless session's init event listing
+`zettelkasten:zettelkasten`. Uninstall and `marketplace remove` then returned clean.
+
+Two things this cost, both recorded rather than glossed. The layout is `"skills": ["./skill"]`
+with the repo root as the plugin root, chosen over the canonical `skills/<name>/` to avoid moving
+a directory that `install.sh`, the Makefile, the goldens and every eval path all point at — and
+verified to load, with the skill id coming from the frontmatter rather than the folder. And
+`skill/SKILL.md` had to become a committed file: a plugin with a gitignored `SKILL.md` installs as
+**zero skills**, silently, because the plugin itself registers cleanly and reports nothing wrong.
+`test_golden.py` now asserts that copy byte-identical to `tests/golden/claude.SKILL.md`, so the
+golden stays the oracle and the second copy cannot drift unnoticed — the design goal was never
+"one file on disk" but "no copy that drifts".
+
 **Discovered, with a control.** `claude --debug-file` reports
 `Loaded N unique skills (… user: N …)`, and the count moves **1 → 0 → 1** as the skill is
 installed, parked and restored. A headless `claude -p --output-format stream-json --verbose`

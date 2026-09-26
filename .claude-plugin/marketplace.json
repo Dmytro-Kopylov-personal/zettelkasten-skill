@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "zettelkasten-skill",
+  "description": "A Zettelkasten vault-maintenance skill for Claude Code.",
+  "owner": { "name": "Dmytro Kopylov" },
+  "plugins": [
+    {
+      "name": "zettelkasten",
+      "description": "Maintain an atomic, densely-linked Zettelkasten vault of permanent notes.",
+      "source": "./",
+      "category": "productivity",
+      "tags": ["notes", "zettelkasten", "knowledge-management"]
+    }
+  ]
+}

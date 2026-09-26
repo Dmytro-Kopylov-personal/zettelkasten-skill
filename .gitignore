@@ -1,6 +1,10 @@
-# Rendered output — never committed; tests/golden/ is the reviewable oracle
+# Rendered output for eyeballing only; tests/golden/ is the reviewable oracle
 dist/
-skill/SKILL.md
+
+# skill/SKILL.md is deliberately NOT ignored. This repo is also a Claude Code plugin, and a
+# plugin must ship a loadable SKILL.md — a gitignored one installs as zero skills. It is the
+# Claude render, and test_golden.py asserts it byte-identical to tests/golden/claude.SKILL.md,
+# so the golden stays the single source of truth: the copy is for the loader, not for reading.
 
 # Python
 __pycache__/

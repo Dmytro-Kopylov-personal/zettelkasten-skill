@@ -32,9 +32,16 @@ an unreviewable concatenation artifact, an unfilled placeholder is a loud render
 rather than a silently truncated file, and the environment block can sit exactly where it
 belongs (after the overview, before the operations) instead of being appended.
 
-The rendered `SKILL.md` is **not committed to `skill/`**. The committed copy lives in
-`tests/golden/`, where it is both the human-reviewable artifact and the byte-exact oracle
-that `--check` diffs against. One copy, two jobs.
+The rendered `SKILL.md` lives in `tests/golden/`, where it is both the human-reviewable artifact
+and the byte-exact oracle that `--check` diffs against.
+
+That was the whole arrangement until this repo became a Claude Code plugin. A plugin must ship a
+loadable `SKILL.md`, and one excluded by `.gitignore` installs as **zero skills** — silently,
+because the plugin itself registers fine and reports nothing wrong. So `skill/SKILL.md` is
+committed after all, as the Claude render. The goal was never "one file on disk" but "no copy
+that can drift unnoticed", and that is now held by a test instead of by absence: `test_golden.py`
+asserts the committed payload is byte-identical to the golden, so a divergence fails in CI rather
+than at a user's install.
 
 `--check` and `install.sh` both call `validate()` and fail closed: an unloadable render is
 never deployed.

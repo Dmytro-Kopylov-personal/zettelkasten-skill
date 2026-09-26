@@ -41,11 +41,26 @@ tests/        golden renders, invariants, fixtures, real-validator adapters
 docs/         design notes, the plan, and measured results
 ```
 
-`skill/SKILL.md` is deliberately **not** in git: the committed render lives in
-`tests/golden/<platform>.SKILL.md`, which is both the reviewable artifact and the
-byte-exact oracle `--check` diffs against. One copy, two jobs, no drift.
+`tests/golden/<platform>.SKILL.md` is the committed render: both the reviewable artifact and the
+byte-exact oracle `--check` diffs against. `skill/SKILL.md` is committed too, because this repo
+doubles as a Claude Code plugin and a plugin must ship a loadable `SKILL.md` — a gitignored one
+installs as zero skills. A test asserts the two are byte-identical, so the golden stays the
+source of truth rather than becoming one of two.
 
 ## Install
+
+### Claude Code
+
+```bash
+claude plugin marketplace add Dmytro-Kopylov-personal/zettelkasten-skill
+claude plugin install zettelkasten@zettelkasten-skill
+```
+
+In a session, the same thing as `/plugin marketplace add` and `/plugin install`. Verified end to
+end: after installing, a headless session's own init event lists `zettelkasten:zettelkasten`
+among its skills.
+
+### Everywhere else
 
 ```bash
 git clone https://github.com/Dmytro-Kopylov-personal/zettelkasten-skill.git
@@ -170,16 +185,17 @@ requiring exactly that check's findings to disappear.
 
 ## Status
 
-The render layer, the linter and the installer are complete and green (**518 tests**), and the
+The render layer, the linter and the installer are complete and green (**523 tests**), and the
 skill is installed and discovered on all three platforms:
 
 | Platform | Installed to | Discovery verified by | Ingest acceptance |
 |---|---|---|---|
 | Hermes | `~/.hermes/skills/research/zettelkasten/` | `hermes skills list`, and a live session's system prompt | **3/3** runs, zero findings |
-| Claude Code | `~/.claude/skills/zettelkasten/` | `Loaded N unique skills` moving 1 → 0 → 1, and a headless init event naming it | ablation run — see the caveat |
+| Claude Code | plugin, or `~/.claude/skills/zettelkasten/` | the plugin path installed end to end in an isolated config, and a headless init event naming `zettelkasten:zettelkasten`; the clone path by `Loaded N unique skills` moving 1 → 0 → 1 | ablation run — see the caveat |
 | Copilot CLI | `~/.copilot/skills/zettelkasten/` | `copilot skill list`, description untruncated | not run |
 
-`docs/results.md` carries the measurements; `docs/plan.md` the phase gates.
+`docs/results.md` carries the measurements and the unverified markers; `docs/plan.md` the phase
+gates.
 
 **Two caveats, stated rather than buried.** Copilot's VS Code extension and cloud agent were
 never exercised — the CLI listing is the only discovery claim made here. And the Claude
