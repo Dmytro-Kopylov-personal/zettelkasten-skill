@@ -5,7 +5,7 @@ is met by something measured, not by something written.
 
 | Phase | Work | Gate — done means | Evidence |
 |---|---|---|---|
-| **P0** Scaffold | `git init`, README/LICENSE/.gitignore/Makefile, commit-msg hook, private GitHub repo, vault project doc + catalog entry | the hook demonstrably rejects an AI co-author trailer | repo URL, hook output |
+| **P0** Scaffold | `git init`, README/LICENSE/.gitignore/Makefile, commit-msg hook, GitHub repo | the hook demonstrably rejects an AI co-author trailer | repo URL, hook output |
 | **P1** Render | template body, 6 fragments, `render.py`, goldens, render/invariant tests | three goldens byte-identical twice; denylist passes **with both controls**; shared-body invariant green; `--check` exits 0 | char/line counts vs budgets, control results |
 | **P2** Parser | `zettel_lint.py` core: YAML subset parser, byte-exact frontmatter split, `Vault` model, wikilink + provenance-marker extraction, `hash` | parser matches `yaml.safe_load` on every fixture block; each unsupported construct raises with the right line; wikilink extraction returns `[]` on all four V3 traps | differential pass count |
 | **P3** Checks | 32 checks, `references/lint-checks.md` 1:1, JSON/text contract, `--fail-on`, `--baseline`, exit codes, all fixtures + MANIFESTs | `vault_defects` matches its manifest in both directions; every expected finding is attributable to its own check by silencing it; `vault_trap` == 1 finding; `vault_clean` == 0; `vault_hostile` == the exact `ZK002` set; `not_a_vault` exits 2; every `doc` anchor resolves; determinism + read-only proofs green | per-fixture counts, baseline round-trip |

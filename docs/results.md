@@ -55,11 +55,25 @@ declares no tag taxonomy)` and `4 notes, 1 raw source, 8 links, orphan rate 0%`,
 `declares no tag taxonomy` and `orphan rate` occur nowhere in the repo outside
 `zettel_lint.py` — while `no note cites 3 or more sources` and `only 8 links` occur nowhere at all,
 because they are composed at runtime from vault-specific numbers. The block is the linter's own
-output, which requires a shell. The claim was removed from both the guide and the commit it came
-from; the observation the paragraph actually wanted — that a missing digest is reported rather
-than passed over — is true of that output and is now what it says.
+output, which requires a shell. The claim was removed from the guide and from the paragraph that
+repeated it — but **not** from the commit message that introduced it, `6fb0ec3`, which still
+carries it. That is a decision, not an oversight: rewriting published history to erase a corrected
+claim would delete the evidence that the claim was ever made, and keeping that evidence is what
+this page is for. The observation the paragraph actually wanted — that a missing digest is
+reported rather than passed over — is true of that output and is now what it says.
 
 **Suite after the pass:** 556 passed, 0 skipped. `make check` green for all three platforms.
+
+**Published.** The repo went public at v1.0.2, after auditing everything tracked. Nothing sensitive
+was in there: no credentials, no `/Users/`-style absolute paths — `tests/test_install.py` asserts
+`/Users/` never ships — and the author's name only where attribution is the point. What the audit
+did find was references to context a public reader cannot reach. Seven were rewritten, none
+deleted: a private skill named as prior art, three skill names inside a dropped `related_skills`
+field, a caveat resting on the author's other vault, an 8–14k size comparison against named peers,
+a `~/dev/` repo path, a plan row naming vault bookkeeping, and a test comment repeating that size
+comparison. Separately, *the spec* — an unpublished design brief cited throughout `design.md` — is
+now glossed once, where it is first used, rather than left undefined on every use. The reasoning
+survives in each case; what is gone is only the pointers a reader could not follow.
 
 ## After v1.0.0 — the Obsidian pass (2026-09-26)
 
@@ -562,9 +576,9 @@ second implementation (`tests/support/platform_rules.py`).
 
 Shared body after stripping both seams: **11,113 bytes, 217 lines** — byte-identical
 across all three renders, which is the assertion that the body was never forked per
-platform. Peer skills (`llm-wiki`, `obsidian`, `hermes-agent-skill-authoring`) sit at
-8–14k; Hermes' hard cap is 100,000 and Copilot's third-party body guidance is 500 lines,
-so both budgets have wide margin.
+platform. Skills of comparable scope, measured on the author's own machine, sit at 8–14k;
+Hermes' hard cap is 100,000 and Copilot's third-party body guidance is 500 lines, so both
+budgets have wide margin.
 
 **Real validators, run for real.** Hermes' `_validate_frontmatter` and
 `_validate_content_size`, and Anthropic's `quick_validate.py`, were loaded from their
@@ -596,6 +610,5 @@ target by the "no target given" guard, so it exited 2. Fixed, with a regression 
 
 ## P0 — Scaffold (2026-09-26)
 
-Repo created at `~/dev/zettelkasten-skill` with the `commit-msg` hook from the notes vault
-(`core.hooksPath=.githooks`). The hook rejects AI co-author trailers; it was exercised
-before the first commit to prove it fires.
+Repo created with the tracked `commit-msg` hook (`core.hooksPath=.githooks`). The hook rejects
+AI co-author trailers; it was exercised before the first commit to prove it fires.

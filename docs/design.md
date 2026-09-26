@@ -3,9 +3,13 @@
 Why this repo looks the way it does. Every claim here is either something a platform's own
 code did when run, or a decision taken in response to it.
 
+Decisions are recorded against *the spec* — the design brief this skill was written from,
+which is not published. Its content is quoted wherever it matters, so nothing below depends
+on reading it.
+
 ## The divergence that is the project
 
-The nearest existing skill, `llm-wiki`, is source-compilation shaped: one page per *thing*.
+The nearest prior art is source-compilation shaped: one page per *thing*.
 This skill is one note per *atomic idea*, with timestamp-stable IDs, typed link verbs, and
 per-claim provenance. A folder of well-written unlinked notes is a pile, and the linter
 says so. That is the whole reason the linter exists: the spec's principles are only
@@ -137,19 +141,19 @@ identical from the inside.
 
 ## Open caveats
 
-- **`related_skills` was dropped rather than shipped.** The spec's
-  `[obsidian, llm-wiki, start-investigation]` name three skills that exist on this machine and
-  nowhere else, so a public clone would carry metadata pointing at nothing. No test asserted the
-  field and Hermes' validator does not require it, so it went and the goldens were regenerated
-  without it. Recorded because the spec still asks for it.
+- **`related_skills` was dropped rather than shipped.** The spec's three entries name skills of
+  the author's own that exist on one machine and nowhere else, so a public clone would carry
+  metadata pointing at nothing. No test asserted the field and Hermes' validator does not
+  require it, so it went and the goldens were regenerated without it. Recorded because the spec
+  still asks for it.
 - **Copilot cannot be fully verified here.** Copilot CLI 1.0.88 is installed and `copilot skill
   list` is checkable; VS Code and the cloud agent are not, and no claim will be made about them
   beyond what was actually exercised.
-- **If this skill is ever pointed at the notes vault**, its root `inbox/` collides
-  conceptually with the `obsidian` skill's `investigations/{inbox,active,archived}/`, which
-  states the user owns triage transitions. Two inboxes with different rules in one vault is
-  a UX hazard. Recommendation: keep the Zettelkasten vault separate — the notes vault is
-  project-shaped, not atomic-note-shaped.
+- **A root `inbox/` can collide with another tool's.** If a vault is also managed by a second
+  skill or plugin with its own capture convention, two inboxes with different rules end up in one
+  directory tree — and if that other convention hands triage transitions to the user, the two
+  disagree about who moves a file. Recommendation: keep a Zettelkasten vault separate from a
+  project-shaped one, and give it its own root.
 - **A loaded skill is not a followed skill.** Mitigations are real but partial: hard gates
   lead the body, the body is ~250 lines rather than the 500 allowed, and lint makes drift
   detectable after the fact. The only honest evidence is the N=3 scripted ingest, which passed

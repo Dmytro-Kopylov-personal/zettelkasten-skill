@@ -18,7 +18,7 @@ import render
 
 PLATFORMS = sorted(render.PLATFORMS)
 
-# Peer skills (llm-wiki, obsidian, hermes-agent-skill-authoring) sit at 8-14k chars.
+# Skills of comparable scope run 8-14k chars; this band is the budget the renders must fit.
 MIN_CHARS, MAX_CHARS = 8_000, 16_000
 # V2: Hermes truncates the catalog line to `desc[:57] + "..."`.
 HERMES_VISIBLE_DESCRIPTION_CHARS = 53
