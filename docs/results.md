@@ -52,15 +52,28 @@ and it fails a deliberately broken one, naming the offending key — so the exit
 evidence rather than a check that cannot fail. Which is the whole problem with the validator
 the gate originally named:
 
-**`claude plugin validate` cannot validate a skill (V7), so the P6 gate struck it.** Its help
-text promises "the skills, agents, and commands in a directory", but it descends only into
-component directories the *manifest* declares; `contents` came back `[]` for every target
-tried. A skill with a non-kebab name, angle brackets in its description and an unrecognised
-`version` key passed identically to a good one, as did a deliberately broken slash command —
-`success: true`, `contents: []`, exit 0 under `--strict`. The manifest half is real (a
-missing `author` does fail), but as a *skill* validator it is a check that cannot fail, and
-the gate as written would have been satisfied by it. Replaced with the two instruments that
-move in both directions: `quick_validate.py`, and discovery.
+**`claude plugin validate` reads one skill layout and is blind to format (V7), so the P6 gate
+struck it.** Its help text promises "the skills, agents, and commands in a directory", but it
+descends only into the **default `skills/` directory** — a `SKILL.md` at the plugin root, or in
+a directory named by the `skills` key, is never opened, and `contents` came back `[]` with exit
+0 under `--strict`. That is this repo's layout exactly (`skill/`, declared via `skills`), so the
+gate as written would not have inspected the skill it was gating. Inside the directory it does
+read the checks are real but shallow: a missing description, a missing frontmatter block and
+unparseable YAML each fail `--strict`, while a non-kebab name, angle brackets in the description
+and an unrecognised `version` key pass identically to a good skill. Not a check that cannot fail
+— a check that fails on the wrong things, in the wrong directory. Replaced with the two
+instruments that move in both directions: `quick_validate.py`, and discovery.
+
+**The loader and the validator disagree in both directions, and a missing description is fatal
+(V9).** Read from the loader's own init event (`claude -p --plugin-dir … --output-format
+stream-json --verbose`, whose `skills` array is real loader output, not a model's account of
+itself): a `SKILL.md` at the plugin root **loads**, with or without a `skills` key, and so does a
+directory named by `skills` — both layouts `validate` never opens. The loader is stricter in
+exactly one place, isolated by holding every other variable constant: the same directory with the
+same `name` loads when a description is present and is absent from the `skills` array when it is
+not, at the plugin root and in a declared directory alike. Every render already requires a
+non-empty description, so nothing changed here; it is recorded because the reason is now known
+rather than assumed.
 
 **Discovered, with a control.** `claude --debug-file` reports
 `Loaded N unique skills (… user: N …)`, and the count moves **1 → 0 → 1** as the skill is

@@ -130,8 +130,9 @@ suite is the only part that wants `uv`, and it uses it to fetch its own dependen
 
 ## Why it is built this way
 
-Six findings came from running the platforms' own code rather than trusting the spec. Five
-changed the design; the sixth changed what the tests check instead. Each is pinned:
+Nine findings came from running the platforms' own code rather than trusting the spec — one of
+them a correction to a claim this repo had already published. `docs/design.md` carries all nine;
+these are the ones that shape daily use:
 
 - **`platforms:` in Hermes is an OS gate, not an agent gate.** `platforms: [copilot, hermes]`
   reads perfectly reasonably and makes the skill invisibly absent on every machine. The
