@@ -359,6 +359,37 @@ A folder of beautifully written unlinked notes is a pile, and the linter will sa
 
 ---
 
+## Retiring a note
+
+There is no delete operation and no `remove` verb. The four operations are `init`, `ingest`, `query`
+and `lint`, and what this skill offers instead of removal is **retirement**, which keeps the record.
+That is the vault's premise rather than a missing feature: a vault that deletes what it no longer
+believes cannot show that it changed its mind.
+
+**Archiving is the ordinary retirement.** Set a note's `status:` to `archived` and it stays where it
+is, stays linkable, and stops asking to be maintained — the staleness prompt (`ZK017`) watches only
+`draft` and `seed`. Nothing else moves. In a vault of thirty notes, archiving the most heavily linked
+note in it left every count identical and raised no finding: exit 0 before and after.
+
+**Superseding is archiving with a successor.** Write the note that replaces it, link the new one to
+the old with `supersedes`, and archive the old one. The old note keeps its place in the graph and in
+the history; what changes is that nothing points at it as current. This is the same instinct as the
+`contradicts` rule in [Your files](#your-files) — the record of what was believed is the thing that
+makes the vault worth keeping.
+
+**Deleting is possible, and loud.** Nothing forbids removing the file. The vault notices anyway:
+deleting that same note produced nine findings — eight `ZK008` dangling links, one for each note
+pointing at it, plus a `ZK012` for the index entry still naming it. Each finding names the file to
+edit, so the work saved by deleting is work done again afterwards.
+
+The exception is the two places where deletion *is* the intended move: a `raw/` capture or an
+`inbox/` file you have decided against. Both say the same thing — compile a note from it, or delete
+it and say why in the log. A queue that only grows is not a queue.
+
+So: **archive to retire, supersede to replace, delete only what was never a note.**
+
+---
+
 ## Your files
 
 This skill writes into a vault you own, so what it will and will not touch matters more than
