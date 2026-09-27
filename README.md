@@ -1,5 +1,9 @@
 # zettelkasten-skill
 
+<p align="center">
+  <img src="docs/splash.jpeg" width="520" alt="A magpie perched on a web of linked note nodes — the zettelkasten-skill banner">
+</p>
+
 A portable agent skill that turns an agent into a **Zettelkasten maintainer**: raw sources
 compile into atomic, densely-linked, provenance-carrying permanent notes.
 
