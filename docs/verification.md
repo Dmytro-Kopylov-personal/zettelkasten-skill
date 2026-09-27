@@ -104,14 +104,18 @@ runs is a small sample, and the ablation above cannot supply a variance figure a
 
 ## The suite
 
-`make test` — **558 passed, 0 skipped, 12.5s** (2026-09-27), no network and no model call. Besides
+`make test` — **561 passed, 0 skipped, 11.4s** (2026-09-27; the time is pytest's own summary line,
+which is what `make test` prints), no network and no model call. Besides
 the fixtures and the goldens it asserts: the linter is read-only (a recursive tree hash before and
 after a full sweep, with a control showing the hash can change), two runs of the same input are
 byte-identical, every subprocess runs under `python3 -I` so stdlib-only is enforced rather than
 stated, `--baseline` suppression is counted rather than hidden (31 keys give 0 findings and exit 0;
 a partial baseline of 5 leaves 26 and exit 1), the installer is idempotent across five cases with
-every path under `--target-root` so `$HOME` is never read or written, and an absolute path from the
-author's machine is asserted absent from the shipped fragments.
+every path under `--target-root` so `$HOME` is never read or written, and no tracked file names a
+path on one machine — `git ls-files`, every file read as UTF-8, `/Users/<name>` or `/home/<name>`
+flagged, with the predicate itself carrying controls in both directions. That guard exists because
+a run artifact carrying the author's home directory sat one `.gitignore` line away from being
+published, so the `.gitignore` line is asserted too.
 
 `make check` renders all three platforms in memory and diffs them against `tests/golden/` — the
 same thing CI runs. `make lint-fixtures` prints the exit code of every fixture.
