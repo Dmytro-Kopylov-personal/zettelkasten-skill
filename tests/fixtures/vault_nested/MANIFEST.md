@@ -5,9 +5,8 @@ every file below must produce exactly the finding listed against it, and the lin
 produce no finding that is not listed. "None" is a claim, not an absence of information.
 
 **Predicted: 0 findings, exit 0, 4 notes, 8 links, 1 raw source, orphan_rate 0.0.**
-Predicted not-applicable: `ZK024` (no note cites 3+ sources), `ZK027` (no `contradicts`
-verb is used at all — unlike `vault_clean`, which has a reciprocal pair and so runs it),
-`ZK029` (8 links, below the 20-link floor), `ZK031` (no `inbox/` directory).
+Predicted not-applicable: `ZK027` alone — no `contradicts` verb is used anywhere in this
+vault, unlike `vault_clean`, which has a reciprocal pair and so runs it.
 
 ## What this fixture is for
 
@@ -25,7 +24,7 @@ changed being where the files sit. Each mutation below was run, and each must fa
 | `rglob` → `glob` on `permanent/` | 0 notes load; every note disappears from the report | 4 failed |
 | dropping the `permanent/`-prefixed form from `Vault.link_index` | `202609200900`'s long-form link becomes a broken `ZK008` | 2 failed |
 | dropping the `.md`-suffixed form from `Vault.link_index` | `202609200903`'s link becomes a broken `ZK008` | 2 failed |
-| `inbound_counts` back to keying on the target string | `202609200902` and `202609200901` each lose one of their two inbound links and become false `ZK011` orphans | 7 failed |
+| `inbound_counts` back to keying on the target string | `202609200902` and `202609200901` each lose one of their two inbound links and become false `ZK010` isolated notes | 7 failed |
 
 The last two rows only fail because this fixture writes three different spellings of the
 same idea: `202609200901-spaced-repetition` (the short form Obsidian writes by default),
@@ -49,10 +48,10 @@ is left flat and says so where the layout is defined.
 
 | File | Purpose | Expected findings |
 |---|---|---|
-| `SCHEMA.md` | Domain and the four-tag taxonomy every note's tags come from | None |
-| `log.md` | Three dated entries, well under the rotation threshold | None |
+| `SCHEMA.md` | Declares all six vocabulary dimensions, as `vault_clean` does — conformance reads frontmatter, so where the notes live must not change its answer | None |
+| `log.md` | Three dated entries; no check counts them any more | None |
 | `structure/index.md` | Lists all 4 notes by slug, the short form Obsidian writes by default | None |
-| `structure/overview.md` | Prose, no links — only `permanent/` is held to the link minimum | None |
+| `structure/overview.md` | Prose, no links — `structure/` is never counted toward anyone's inbound links | None |
 | `raw/articles/nested-source.md` | Cited by all 4 notes; digest recorded and correct | None |
 | `permanent/cognition/202609200900-attention-budget.md` | Links to `202609200901` by the short form and to `202609200902` by the **vault-relative long form**, in frontmatter and body alike | None |
 | `permanent/cognition/202609200901-spaced-repetition.md` | Two links, both short form | None |
@@ -62,12 +61,10 @@ is left flat and says so where the layout is defined.
 ## Why these links
 
 Note *i* links to notes *i+1* and *i+2* (mod 4), so every note has exactly two outbound and
-two inbound links, and the orphan check has nothing to report — without `structure/` curing
+two inbound links, and the isolation check has nothing to report — without `structure/` curing
 anything, since `structure/` links are excluded from the inbound count by design. `contradicts`
 is not used at all, which is what makes `ZK027` not-applicable rather than passing: a check
 that could not run must say so, because silence and success are indistinguishable in a count.
-
-Every note cites one source, keeping `ZK024` below its three-source floor.
 
 ## The link spellings Obsidian actually writes
 

@@ -7,11 +7,18 @@ A finding is a claim, not a verdict. The linter reads frontmatter, links, dates 
 it cannot read meaning. When a finding and your judgement disagree, the judgement wins — but
 say so in `log.md` rather than leaving the next reader to wonder.
 
+**Every check here asserts a fact about the vault's own files.** A reference that resolves to
+nothing, a digest that no longer matches, two notes claiming one identity, a log entry with
+no date. Nothing here decides by a number: "800 words is too long" and "ninety days without
+promoting a draft is too long" are opinions, they were once shipped with the same authority as
+the facts beside them, and they are gone. The rule that removed them is in
+`## What v2 retired, and why`, with every code it took.
+
 ## How to read a finding
 
 | Field | Meaning |
 |---|---|
-| `code` | which check fired, e.g. `ZK011` |
+| `code` | which check fired, e.g. `ZK010` |
 | `severity` | `error` (CI fails), `warn` (decay), `info` (advisory) |
 | `file`, `line` | where to look; `line` is a real line of that file, or null for whole-file findings |
 | `subject` | what the finding is *about* — a slug, a path, a tag, a field name. Together with `code` and `file` it is the finding's identity, and it is what a baseline records |
@@ -24,9 +31,10 @@ say so in `log.md` rather than leaving the next reader to wonder.
 
 - `error` — the vault is structurally broken, or a claim's provenance cannot be checked.
   Default `--fail-on` threshold: these are the findings that make the command exit 1.
-- `warn` — the vault is decaying: an orphan, a stale draft, a digest that no longer matches.
-- `info` — advisory, and some of it is a matter of taste. Never fails a run unless you ask
-  for it with `--fail-on info`.
+- `warn` — the vault is inconsistent: an isolated note, a digest that no longer matches, a
+  note that does not match the vocabulary its own `SCHEMA.md` declares.
+- `info` — advisory, and some of it is a matter of judgement. Never fails a run unless you
+  ask for it with `--fail-on info`.
 
 Exit codes: **0** clean at the threshold · **1** findings at or above it · **2** not a vault,
 or a usage error. Exit 2 with well-formed JSON on stdout means the linter did not understand
@@ -34,17 +42,23 @@ the directory, which is not the same answer as "no findings" and must never be r
 
 ## Not applicable is not the same as passed
 
-When a check has nothing to read — no `raw/` to hash, no `inbox/`, fewer links than a ratio
-needs — it is reported in `skipped_checks` with its reason, not silently counted as clean.
-A vault of three notes is not a vault that passed twenty-nine checks; the report says which
-ones had no surface to examine.
+When a check has nothing to read — no `raw/` to hash, no `structure/index.md` to compare, no
+permanent notes at all — it is reported in `skipped_checks` with its reason, not silently
+counted as clean. A vault of three notes is not a vault that passed fifteen checks; the
+report says which ones had no surface to examine.
+
+The one to watch is `ZK003`, because a vault can switch it off by declaring nothing in its
+`SCHEMA.md`. That is the intended behaviour for a vault carried in from elsewhere, and it
+means a clean report from such a vault is *unjudged* on conformance rather than *conforming*.
+`declared_sources` in the JSON says which dimensions were read and which were absent.
 
 ## No `--fix`, on purpose
 
 The tool verifies; you write. Three reasons, in order of weight:
 
 1. The highest-value findings are semantic — is this one idea or two? which verb is it
-   really? — and no mechanical rule can answer them.
+   really? — and no mechanical rule can answer them. Some of those are no longer checks at
+   all, which changes the phrasing of this reason but not its weight.
 2. The mechanically easy ones (bumping a date, inserting an index line) are exactly where a
    wrong edit silently corrupts the vault rather than failing loudly.
 3. Ingest has a propose-then-approve contract. A second write path that skips it would be the
@@ -62,8 +76,63 @@ those findings. The key is `code|file|subject` — deliberately without the line
 that editing a file's top does not resurrect a finding you already reviewed and accepted.
 
 Suppressed findings are counted in `summary.baselined`. They are not hidden: a report that
-says "0 findings, 31 baselined" is telling you something quite different from one that says
+says "0 findings, 20 baselined" is telling you something quite different from one that says
 "0 findings", and this tool will not let you confuse the two.
+
+**A baseline written under v1 keeps working.** A surviving code means what it always meant, so
+its key still matches and still suppresses. A retired code matches nothing, so its key is
+inert and silences nothing — but read the retirement table below before trusting an old
+baseline to be complete: a finding that changed code is reported once more before it can be
+baselined again under the new one.
+
+## What v2 retired, and why
+
+The v2 rule: **a check may assert only a fact about the vault's own files; if it needs a
+number to decide, it is an opinion and does not ship.** Seventeen codes went. Retired numbers
+are never reused — `ZK019` means one thing in every version — so the gaps are honest, and this
+table is the record of what each one did.
+
+Three groups, and the third is a scope decision rather than a consequence of the rule. It is
+listed anyway, because a code that stops being checked is a code that stops being checked
+however it got there.
+
+**Folded into a survivor.** Same subject, one code. Each survivor's old subject is contained
+in the new one, which is the only way a surviving number was allowed to change meaning.
+
+| Retired | What it did | Now |
+|---|---|---|
+| `ZK004` | a `type`, `status` or `confidence` outside its enum | `ZK003` — the enum is the vault's now |
+| `ZK007` | two notes claiming one `id` | `ZK006` — identity is one subject |
+| `ZK009` | a link verb outside the six | `ZK003` — the six are declared, not imposed |
+| `ZK011` | no note linked to this one | `ZK010` — either direction is isolation |
+| `ZK013` | a `sources:` entry named no file in the vault | `ZK008` — a reference that resolves to nothing |
+| `ZK016` | a tag outside the taxonomy | `ZK003` — the taxonomy is the vault's |
+| `ZK018` | a `^[raw/...]` marker named no file | `ZK008` — the same defect, another surface |
+
+**Decided by a number.**
+
+| Retired | The number | Why it went |
+|---|---|---|
+| `ZK017` | 90 days in `draft` or `seed` | nothing about a ninetieth day makes a note ready |
+| `ZK023` | 800 words | a long note is not a defect; some ideas are long |
+| `ZK024` | 3 sources, 25 words | the reasoning it gated is still good advice, and is prose now |
+| `ZK029` | 20 links, 60% one verb | a share that is honest in one vault is evasion in another |
+| `ZK030` | 3 sections, 40 words each | the shape is worth noticing; the counts never decided it |
+| `ZK031` | 30 days in `inbox/` | an inbox is a queue, and how long is too long is yours |
+| `ZK032` | 500 log entries | nobody reads entry 900, and nobody agrees where 900 starts |
+
+**Advisory by nature — a hint the reader was told to overrule.**
+
+| Retired | What it did | Why it went |
+|---|---|---|
+| `ZK020` | a self-link, or one target linked twice | a style preference, and not what integrity means |
+| `ZK021` | two notes whose titles share a slug | a weak proxy for duplication, and it said so |
+| `ZK025` | "and" in the title | "truth and reconciliation" is one thing; the code admitted this |
+
+None of the seventeen is gone because it was wrong to *think about*. What is gone is the
+claim that the linter had measured something. Where the idea survives it survives as advice —
+in `references/note-format.md` and `references/schema-reference.md` — which is where a
+judgement call belongs.
 
 ---
 
@@ -100,30 +169,34 @@ plain scalars, quoted scalars, flow lists, block lists, lists of single-key maps
 anything else is refused rather than guessed at.
 
 <a id="zk003"></a>
-### ZK003 — a required field is missing
+### ZK003 — the note does not match the vocabulary its vault declares
 
-**Severity:** error
+**Severity:** warn
 
-**Fires when** `id`, `title`, `type`, `status` or `created` is absent or empty. One finding
-per field.
+**Fires when** a note breaks any dimension its own `SCHEMA.md` declares. Six dimensions, each
+independent:
 
-**Fix:** add the field. `id` must equal the timestamp in the filename.
+| Dimension | Fires on |
+|---|---|
+| `required_fields` | a declared field absent or empty |
+| `types` | a `type` value not in the list |
+| `statuses` | a `status` value not in the list |
+| `confidences` | a `confidence` value not in the list |
+| `tags` | a tag not in the list |
+| `verbs` | a link verb not in the list |
 
-**By hand:** read the frontmatter and check that all five keys are present and non-empty.
+**An undeclared dimension is not checked, and is not defaulted.** A vault that declares
+nothing is judged against nothing, and the check is reported not applicable rather than
+passing — that is what makes this check safe for a vault carried in from another tool, whose
+`essay` and `enquête` are not wrong for being different words. The trade is that an
+undeclared dimension is unguarded, so declare the ones you care about.
 
-<a id="zk004"></a>
-### ZK004 — a field has a value outside its enum
+**Fix:** use a declared value, or add the new one to `SCHEMA.md` deliberately. The vocabulary
+that grows one note at a time is not a vocabulary, and the file is the place to argue with it
+— `declared_sources` in the JSON says which dimensions were actually read.
 
-**Severity:** error
-
-**Fires when** `type` is not one of `permanent`, `source`, `structure`; `status` is not one
-of `draft`, `seed`, `evergreen`, `archived`; or `confidence` is not one of `low`, `medium`,
-`high`. An absent field is ZK003's business, not this check's.
-
-**Fix:** use a documented value. If the vocabulary genuinely needs a new word, change
-`SCHEMA.md` first, so every note is judged against one vocabulary.
-
-**By hand:** compare each of the three fields against the lists in `references/note-format.md`.
+**By hand:** read the six lists in `SCHEMA.md` and compare each note's fields against them.
+A dimension that is not there is a dimension nobody is checking.
 
 <a id="zk005"></a>
 ### ZK005 — a date is not a date
@@ -139,89 +212,72 @@ reported when it is not in that exact form.
 **By hand:** check the two dates lie in the calendar, in order, and in the documented format.
 
 <a id="zk006"></a>
-### ZK006 — the filename and the id disagree
+### ZK006 — identity is broken
 
 **Severity:** error
 
-**Fires when** the filename is not `YYYYMMDDHHMM-slug.md`, the timestamp is not a real
-date and time, or the `id` field does not match the timestamp.
+**Fires when** the filename is not `YYYYMMDDHHMM-slug.md`, the timestamp is not a real date
+and time, the `id` field does not match the timestamp, or two notes carry the same `id`.
 
 **Fix:** rename the file, or correct `id`. The filename is what links resolve to, so when the
 two disagree the filename is the one that other notes already depend on. IDs are identity:
-renaming to fix a typo is fine, renaming to move a note is not.
+renaming to fix a typo is fine, renaming to move a note is not. Two notes sharing an id are
+almost always one idea written twice — merge them, or give one a fresh id and filename from
+the moment you actually split them.
 
-**By hand:** compare the first twelve characters of the filename with the `id` field.
-
-<a id="zk007"></a>
-### ZK007 — two notes claim the same id
-
-**Severity:** error
-
-**Fires when** more than one note carries the same `id`. Reported once per extra note, with
-every path that shares the id in the evidence.
-
-**Fix:** these are almost always one idea written twice. Merge them, or give one a fresh id
-and filename from the moment you actually split them. The evidence line names both files.
-
-**By hand:** collect the `id` values; a duplicate jumps straight out of a sorted list.
+**By hand:** compare the first twelve characters of each filename with its `id`, then sort the
+`id` values — a duplicate jumps straight out of a sorted list.
 
 <a id="zk008"></a>
-### ZK008 — a link points at a note that does not exist
+### ZK008 — a reference points at nothing
 
 **Severity:** error
 
-**Fires when** a frontmatter link target, or a `[[wikilink]]` in the body, does not resolve
-to any note. One finding per (note, target), not per mention: a broken target appears in the
-frontmatter and again in the body's Links section by design, and may be named several times
-in the prose besides; counting each would inflate the total for a single defect.
+**Fires when** any of the four ways a note names a target fails to resolve:
 
-**Fix:** create the note, or point the link at the note that does exist. A link to a note you
-*intend* to write is a note you have not written.
+| Surface | Written as |
+|---|---|
+| a frontmatter link | `target: 202609251200-spaced-repetition` |
+| a wikilink in the body | `[[202609251200-spaced-repetition]]` |
+| a citation | `sources: [raw/articles/karpathy-llm-wiki-2026.md]` |
+| a provenance marker | `^[raw/articles/karpathy-llm-wiki-2026.md]` |
 
-**By hand:** list every `[[...]]` and every `target:` value and check each against the
-filenames in `permanent/`.
+One finding per (note, target), not per mention. A target appears in the frontmatter and again
+in the body's Links section by design, and may be named several times in the prose besides;
+counting each would inflate the total for one defect.
 
-<a id="zk009"></a>
-### ZK009 — a link verb is not one of the six
+A target resolves if it names a note, or a file in the vault. A note resolves by its name
+alone — `[[202609251200-slug]]`, `[[memory/202609251200-slug]]` and either with `.md`
+appended all reach the same file wherever it sits. A path under `raw/` may also be written
+without the extension: `raw/articles/captured` resolves to `raw/articles/captured.md` if that
+is there, and to nothing if it is not.
 
-**Severity:** error
+**Fix:** create the note, capture the source, or point the reference at what does exist. A
+link to a note you *intend* to write is a note you have not written.
 
-**Fires when** a link's `verb` is not `extends`, `supports`, `contradicts`, `source`,
-`applies` or `supersedes`.
-
-**Fix:** choose one of the six. The verb is the whole point of a typed link — an untyped link
-is a mention. If none of the six fits, that is a signal about the taxonomy, and the place to
-record it is `SCHEMA.md`, deliberately.
-
-**By hand:** read the `verb:` lines. The six are short and there is no seventh.
+**By hand:** list every `[[...]]`, every `target:`, every `sources:` entry and every `^[...]`
+marker, and check each against the filenames in the vault.
 
 <a id="zk010"></a>
-### ZK010 — fewer than two outbound links
-
-**Severity:** error
-
-**Fires when** a note has zero or one outbound link. Two is the floor, not the target.
-
-**Fix:** link the note to the ideas it extends, supports or contradicts. If you cannot name
-two, the note is probably not atomic and needs splitting — a note with no relatives is
-usually two half-notes sharing a title.
-
-**By hand:** count the `target:` entries under `links:`.
-
-<a id="zk011"></a>
-### ZK011 — the note has no inbound links
+### ZK010 — the note is isolated
 
 **Severity:** warn
 
-**Fires when** nothing links to a note. **Links from `structure/` do not count** — otherwise
-`index.md` would cure every orphan and the check would be vacuous. Being listed in the index
-is not the same as being linked, which is why an indexed note can still be an orphan.
+**Fires when** a note links out to nothing, nothing links to it, or both. **Links from
+`structure/` do not count** — otherwise `index.md` would cure every isolated note and the
+check would be vacuous. Being listed in the index is not the same as being linked, which is
+why an indexed note can still be isolated.
 
-**Fix:** link it from a note that depends on it. An orphan is invisible: nothing will lead a
-reader to it, and it will not be found by following links.
+One link is enough to be reachable in one direction, and this check does not ask for two. The
+floor of two outbound links is still the advice — a note with no relatives is usually two
+half-notes sharing a title — but it was a number deciding, and the numbers are gone.
 
-**By hand:** for each note, search the other notes for its slug. Ignore hits that come only
-from `structure/`.
+**Fix:** link it to the ideas it extends, supports or contradicts, and link it from a note
+that depends on it. An isolated note is invisible: nothing will lead a reader to it, and it
+will not be found by following links.
+
+**By hand:** for each note, list its `target:` entries and search the other notes for its own
+slug. Ignore hits that come only from `structure/`.
 
 <a id="zk012"></a>
 ### ZK012 — the index and the vault disagree
@@ -237,19 +293,6 @@ that is wrong in either direction is worse than no map.
 
 **By hand:** compare the wikilinks in the index with the filenames in `permanent/`, both
 ways. The second direction is the one people forget.
-
-<a id="zk013"></a>
-### ZK013 — a cited source is not in the vault
-
-**Severity:** error
-
-**Fires when** a path in a note's `sources:` list is not a file in the vault.
-
-**Fix:** capture the source under `raw/`, or correct the path. This check is about the
-frontmatter citation; the inline marker is ZK018, and it is a separate check because the two
-can disagree — a note can cite a source it never marks, and mark one it never cites.
-
-**By hand:** for each `sources:` entry, look for the file.
 
 <a id="zk014"></a>
 ### ZK014 — a captured source records no digest
@@ -276,45 +319,6 @@ bookmark, not a note; if it is a note you will write later, it belongs in `inbox
 
 **By hand:** open the file and look below the closing `---`.
 
-<a id="zk016"></a>
-### ZK016 — a tag is not in the taxonomy
-
-**Severity:** warn
-
-**Fires when** a note's `tags:` include one that `SCHEMA.md` does not declare. If `SCHEMA.md`
-declares no tags at all, this check is not applicable rather than failing everything.
-
-**Fix:** use an existing tag, or add the new one to `SCHEMA.md` deliberately. Tags that drift
-one note at a time stop being a vocabulary.
-
-**By hand:** compare each tag against the list in `SCHEMA.md`.
-
-<a id="zk017"></a>
-### ZK017 — a draft or seed note has gone stale
-
-**Severity:** warn
-
-**Fires when** `status` is `draft` or `seed` and the note has not been touched for longer
-than `stale_draft_days` (default 90), measured from `updated`, falling back to `created`.
-
-**Fix:** promote it, split it, or archive it. A seed that has been a seed for a year is not
-growing, and the useful decision is usually to archive it and stop paying attention to it.
-
-**By hand:** list the notes whose status is `draft` or `seed`, sorted by `updated`.
-
-<a id="zk018"></a>
-### ZK018 — a provenance marker points at nothing
-
-**Severity:** error
-
-**Fires when** an inline marker `^[raw/path/file.md]` names a file that is not in the vault.
-
-**Fix:** capture the source under `raw/`, or remove the marker. Never leave a marker that
-cannot be followed: it is a claim about where something came from, and a claim that cannot be
-checked is worse than an honest absence of one.
-
-**By hand:** collect every `^[...]` in note bodies and check each target exists.
-
 <a id="zk019"></a>
 ### ZK019 — the recorded digest no longer matches
 
@@ -329,37 +333,6 @@ Re-ingest the source and update the notes that cite it.
 **By hand:** recompute the digest with the bundled `hash` subcommand and compare. The
 evidence field shows both values.
 
-<a id="zk020"></a>
-### ZK020 — a link that says nothing
-
-**Severity:** warn
-
-**Fires when** a note links to itself, or links to the same target more than once.
-
-**Fix:** remove the self-link; keep one link with the verb that fits best. Two links to one
-target is not emphasis, it is a sign that the two verbs were both nearly right, which is
-worth resolving rather than recording.
-
-**By hand:** read the `links:` block and look for a repeated target or the note's own slug.
-
-<a id="zk021"></a>
-### ZK021 — two notes share a title slug
-
-**Severity:** warn
-
-**Fires when** two or more notes have titles that reduce to the same slug. One finding per
-extra note, with all the paths in the evidence.
-
-**Fix:** these are usually one idea; merge them, or retitle one so its title says what makes
-it different.
-
-**By hand:** slugify the titles — lowercase, non-alphanumerics to hyphens — and sort them.
-
-**This is deliberately the only duplication check.** Detecting notes that *mean* the same
-thing without sharing a title needs embeddings, which this linter does not have and does not
-pretend to. A shared slug is a proxy, and a weak one: it catches the copies and misses the
-paraphrases. Query-time obligations in the skill body cover the rest.
-
 <a id="zk022"></a>
 ### ZK022 — a log entry carries no date
 
@@ -372,58 +345,9 @@ at some point.
 
 **By hand:** read the bullets and check each has a date.
 
-<a id="zk023"></a>
-### ZK023 — the note is long
-
-**Severity:** info
-
-**Fires when** the body exceeds `oversized_note_words` (default 800). Word count only, and
-code fences and inline code are blanked before counting — a note that is mostly a listing is
-not a long note.
-
-**Fix:** length alone is not a defect — some ideas are long. Check whether it holds one idea,
-or several wearing one title. The better signal for splitting is ZK030, which looks at the
-shape rather than the size.
-
-**By hand:** count the prose words, then read the note and ask what its title promises.
-
-<a id="zk024"></a>
-### ZK024 — a paragraph carries no provenance
-
-**Severity:** info
-
-**Fires when** a note cites `provenance_min_sources` or more sources (default 3) and has a
-top-level paragraph of `provenance_min_words` or more (default 25) with no `^[raw/...]`
-marker. Headings, tables, lists and quotations are not paragraphs for this purpose.
-**Aggregated to one finding per note**, with the offending lines in the evidence, capped at
-five. A note with `provenance: note` in its frontmatter is skipped entirely — that is the
-opt-out, and using it is a statement that the paragraph is your own synthesis.
-
-**Fix:** cite the source inline, or add `provenance: note` if the paragraph really is your
-own reasoning rather than a restatement of something you read.
-
-**By hand:** for each note with three or more sources, read its long paragraphs and check
-each has a marker.
-
-**Known false positives, stated rather than discovered later:** a synthesis paragraph that
-legitimately draws on all the sources at once; verbatim quotations; and languages written
-without spaces between words, where the word count is meaningless. This check ships at
-`info` for that reason, and is promoted only if a measurement supports it. The deterministic
-half of provenance — whether the cited files exist — is ZK018 at `error`, and that is the
-half worth failing a build on.
-
-<a id="zk025"></a>
-### ZK025 — the title contains "and"
-
-**Severity:** info
-
-**Fires when** the word "and" appears in the title, case-insensitively.
-
-**Fix:** a title that needs "and" usually names two ideas, and the note is often two notes.
-Sometimes "and" is part of one idea's name — "truth and reconciliation" is not two things —
-in which case this finding is wrong and you should say so and move on.
-
-**By hand:** read the titles.
+How long the log is allowed to get is not a check. Rotating older entries into
+`log-archive.md` when the file stops being readable at a glance is still the practice, and the
+judgement is yours.
 
 <a id="zk026"></a>
 ### ZK026 — a captured source is never used
@@ -453,6 +377,11 @@ arrives at B never learns that something disagrees with it.
 
 **By hand:** find every `contradicts` link and check the target links back.
 
+This check is keyed on the verb `contradicts` by name. A vault whose declaration leaves it out
+— or which expresses disagreement with a different verb — has no way to state the
+relationship, and so has nothing to reciprocate; the check is reported not applicable. If you
+disagree with something, saying so in the vocabulary is what makes the obligation apply.
+
 <a id="zk028"></a>
 ### ZK028 — the Links section and the frontmatter disagree
 
@@ -467,68 +396,13 @@ reading and the frontmatter is for finding, and this check exists so the two can
 
 **By hand:** compare the `[[...]]` links in the body with the `target:` list.
 
-<a id="zk029"></a>
-### ZK029 — the verbs have collapsed
-
-**Severity:** info
-
-**Fires when** the vault has at least `verb_monoculture_min_links` links (default 20) and
-more than `verb_monoculture_ratio` of them (default 60%) use the same verb.
-
-**Fix:** either the vault really is monotone — that happens, and a vault about one thing can
-be all `extends` — or the taxonomy is too fine for how you actually think, in which case the
-honest response is to merge verbs in `SCHEMA.md` rather than to keep assigning verbs you do
-not believe. This finding is about the vault, not about a file, so it has no file.
-
-**By hand:** count the verbs and look at the distribution. Six verbs with one of them at 90%
-is a taxonomy that has collapsed to a favourite.
-
-<a id="zk030"></a>
-### ZK030 — the note has several substantial sections
-
-**Severity:** info
-
-**Fires when** a note has `multi_idea_sections` or more `##` sections (default 3) each
-holding at least `multi_idea_section_words` words (default 40).
-
-**Fix:** a split candidate — each section may be its own idea. This is the real splitting
-signal, and it is about shape rather than length: a long single-section note is usually one
-idea argued at length, while a short note with four headed sections is usually four ideas.
-
-**By hand:** read the `##` headings and ask whether each one could stand as a title.
-
-<a id="zk031"></a>
-### ZK031 — something has been sitting in the inbox
-
-**Severity:** info
-
-**Fires when** a file in `inbox/` has a `created`, `captured` or `ingested` date older than
-`inbox_stale_days` (default 30). Files with no readable date are not reported.
-
-**Fix:** ingest it, or delete it and say why. An inbox is a queue, not a folder: if it only
-grows, the capture step is working and the compile step is not.
-
-**By hand:** list `inbox/` and compare the dates with today.
-
-<a id="zk032"></a>
-### ZK032 — the log is growing without bound
-
-**Severity:** info
-
-**Fires when** `log.md` holds more than `log_rotation_entries` entries (default 500).
-
-**Fix:** rotate the older entries into `log-archive.md`. The log is the vault's history and
-should be readable; nobody reads entry 900.
-
-**By hand:** count the bullets.
-
 ## Deliberately not checked
 
 Recorded here so that their absence is a decision rather than an oversight:
 
 | Not checked | Why |
 |---|---|
-| semantic duplicates (notes that mean the same thing) | needs embeddings; the deterministic proxy is ZK021, and it is a weak one, as its section says |
+| semantic duplicates (notes that mean the same thing) | needs embeddings. There is no deterministic proxy any more: the shared-title-slug check was `ZK021` and it retired, because a proxy that catches the copies and misses the paraphrases was being read as more than it was |
 | contradictory tags across notes | not deterministic. Partly covered by ZK027 for explicit contradictions, and otherwise by the obligation on the agent, at query time, to flag a conflict it notices |
 | "the note is stale relative to its newest source" | ill-defined — a note is not invalidated by a newer source, it is contextualised by it |
 | "the first paragraph should be one sentence" | computable and meaningless; it would generate noise in proportion to how many notes are written well |

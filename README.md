@@ -185,7 +185,7 @@ the directory you are standing in:
 
 ```
 zettelkasten/
-├── SCHEMA.md          the vault's own conventions — domain, tags, thresholds
+├── SCHEMA.md          the vault's own conventions — domain, tags, vocabulary
 ├── log.md             one line per operation, oldest first
 ├── raw/               sources, captured and never edited again
 │   ├── articles/
@@ -196,21 +196,20 @@ zettelkasten/
 └── inbox/             quick captures awaiting triage
 ```
 
-`SCHEMA.md` is the important one. It is the vault's constitution, and it **overrides the skill's
-defaults** — if your schema says two link verbs, the agent uses two.
+`SCHEMA.md` is the important one. It is the vault's constitution, and it **carries the vault's own
+vocabulary** — if your schema declares two link verbs, those are the two the agent uses, and a
+dimension it says nothing about is not checked at all.
 
 Then it lints the empty vault, which is the first place the design shows:
 
 ```
 0 notes, 0 raw sources, 0 links, orphan rate 0%
-NOT RUN: ZK003..ZK030 (22 checks; not applicable: the vault has no permanent notes)
+NOT RUN: ZK003, ZK005, ZK006, ZK008, ZK010, ZK015, ZK027, ZK028 (not applicable: the vault has no permanent notes)
 NOT RUN: ZK014, ZK019, ZK026 (not applicable: the vault has no raw sources)
-NOT RUN: ZK029 (not applicable: only 0 links; the check needs 20)
-NOT RUN: ZK031 (not applicable: the inbox is empty)
 no findings
 ```
 
-`no findings`, exit 0 — and twenty-seven checks named as **not run**. That distinction is the whole
+`no findings`, exit 0 — and eleven checks named as **not run**. That distinction is the whole
 design: a check that cannot run is reported as not-run, never as a pass, so a small vault cannot
 read as a clean one by accident.
 
@@ -237,8 +236,9 @@ It reads the source, searches the vault for anything already covering the same g
 you a plan. This one is real output from a run, lightly trimmed for length:
 
 > **Reconnaissance** — `permanent/` is empty, so there are no existing notes to duplicate. The
-> vault's schema sets the domain — *how claims get verified* — and declares an **empty tag
-> taxonomy**, so I will assign no tags rather than invent them.
+> vault's schema sets the domain — *how claims get verified* — and declares **no tag vocabulary**
+> (an empty list, which is how a dimension goes undeclared), so I will assign no tags rather than
+> invent them.
 >
 > **Plan**
 >
@@ -305,16 +305,13 @@ error: 1
         action:  run `zettel_lint.py hash <file>` and record the digest
 
 4 notes, 1 raw source, 8 links, orphan rate 0%
-NOT RUN: ZK016 (not applicable: SCHEMA.md declares no tag taxonomy)
-NOT RUN: ZK024 (not applicable: no note cites 3 or more sources)
 NOT RUN: ZK027 (not applicable: no note uses the 'contradicts' verb)
-NOT RUN: ZK029 (not applicable: only 8 links; the check needs 20)
-NOT RUN: ZK031 (not applicable: the inbox is empty)
 ```
 
 The single `error` is the point. Nothing had computed the digest, so rather than passing the file
-the linter says so — and the five `NOT RUN` lines name the checks this vault is too small to
-exercise, instead of letting their silence read as a pass.
+the linter says so — and the `NOT RUN` line names the one check this vault gives no purchase to,
+instead of letting its silence read as a pass. Four notes and eight links are enough surface for
+the other fourteen, and exactly one of those has something to say.
 
 The linter **never edits anything**. It reports; the agent proposes a fix; you approve. The remedy
 for the finding above is `zettel_lint.py hash <file>`, which prints a digest for you to record —
@@ -405,15 +402,16 @@ uncoloured because it is an actor here, not a state. The colours only echo what 
 says, so the diagram still reads in greyscale.
 
 Every note is in one of those four states, and `status` is a required field, so there is no fifth.
-The first three are working states. The moves between them are promotions, and nothing promotes a
-note for you: `ZK017` is the only nudge in the system, a warning that a `draft` or `seed` has gone
-untouched for `lint_stale_draft_days` — 90 by default — and its wording is the choice it is offering
-you, *promote it, split it, or archive it*. `archived` is the one state you leave on purpose.
+The first three are working states, and the moves between them are promotions. **Nothing promotes a
+note for you, and nothing nags you about it.** A `draft` or `seed` may sit untouched for a year
+without a finding: the prompt to promote, split or archive one is real advice, but "long enough to
+matter" is a judgement, and no day count can make it. `archived` is the one state you leave on
+purpose.
 
 **Archiving is the ordinary retirement.** Set a note's `status:` to `archived` and it stays where it
-is, stays linkable, and stops asking to be maintained — the staleness prompt (`ZK017`) watches only
-`draft` and `seed`. Nothing else moves. In a vault of thirty notes, archiving the most heavily linked
-note in it left every count identical and raised no finding: exit 0 before and after.
+is, stays linkable, and stops asking to be maintained. Nothing else moves: on the four-note vault
+above, archiving the most heavily linked note of the four changed no count, raised no finding and
+left the exit code where it was.
 
 **Superseding is archiving with a successor.** Write the note that replaces it, link the new one to
 the old with `supersedes`, and archive the old one. The old note keeps its place in the graph and in
@@ -421,10 +419,11 @@ the history; what changes is that nothing points at it as current. This is the s
 `contradicts` rule in [Your files](#your-files) — the record of what was believed is the thing that
 makes the vault worth keeping.
 
-**Deleting is possible, and loud.** Nothing forbids removing the file. The vault notices anyway:
-deleting that same note produced nine findings — eight `ZK008` dangling links, one for each note
-pointing at it, plus a `ZK012` for the index entry still naming it. Each finding names the file to
-edit, so the work saved by deleting is work done again afterwards.
+**Deleting is possible, and loud.** Nothing forbids removing the file; the vault notices anyway.
+Deleting that same note from the four-note vault added four findings to the one already there — a
+`ZK008` for each of the three notes that pointed at it, plus a `ZK012` for the index entry still
+naming it. Each finding names the file to edit, so the work saved by deleting is work done again
+afterwards.
 
 The exception is the two places where deletion *is* the intended move: a `raw/` capture or an
 `inbox/` file you have decided against. Both say the same thing — compile a note from it, or delete
@@ -533,8 +532,8 @@ findings that changed the design, each with what established it.
 | | |
 |---|---|
 | `skill/references/note-format.md` | the note contract, field by field |
-| `skill/references/schema-reference.md` | `SCHEMA.md`, the six verbs, thresholds, the Page Threshold |
-| `skill/references/lint-checks.md` | all 32 checks: predicate, remediation, and a manual-scan line |
+| `skill/references/schema-reference.md` | `SCHEMA.md`, the six verbs, the vocabulary, the Page Threshold |
+| `skill/references/lint-checks.md` | all 15 checks: predicate, remediation, and a manual-scan line |
 | `skill/references/tool-free-fallback.md` | what to do with no shell |
 | `docs/architecture.md` | how it is shaped, and where the three platforms pull apart — diagrams |
 | `docs/design.md` | why it is built this way, including what went wrong on the way |

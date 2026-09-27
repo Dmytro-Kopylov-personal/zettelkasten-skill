@@ -10,7 +10,7 @@ right and this file is a default. Read it before the first write of a session.
 ## The vault
 
 ```text
-SCHEMA.md                 what this vault is about, its tags, its thresholds
+SCHEMA.md                 what this vault is about, and the vocabulary it declares
 log.md                    one line per operation, oldest first
 permanent/                the notes: atomic, linked, sourced — may be filed in subdirectories
 raw/articles/             captured sources, immutable
@@ -38,13 +38,15 @@ indexed by the wrong file.
 One idea per note. Three tests, in the order that resolves the question fastest:
 
 1. **The title test.** If the title needs "and", it is two notes. This catches most of them,
-   and `ZK025` reports it — as a hint, not a verdict: "truth and reconciliation" is one
-   thing.
+   with the standing caveat that it is a hint rather than a verdict: "truth and
+   reconciliation" is one thing.
 2. **The deletion test.** Delete one clause. Does the note still say something true and
    complete? Then the clause was a second note.
 3. **The link test.** Can you name two different notes this one extends, supports or
    contradicts? A note with no relatives is usually two half-notes sharing a title. Two
-   outbound links is the floor (`ZK010`) for this reason.
+   outbound links is the working floor for this reason — advice to a writer, not a rule the
+   linter enforces: a note that links to nothing at all is reported (`ZK010`), and one that
+   links once is reported by nobody.
 
 The failure mode is not a note that is too long. It is a note that answers two questions, so
 that neither answer can be linked precisely, and a reader who arrives for one of them gets
@@ -89,13 +91,15 @@ candidates is worth a moment: the wrong verb is a small lie the graph tells fore
 If none of the six fits, that is information about the vocabulary, not about the link. Record
 it in `SCHEMA.md` deliberately; do not reach for the nearest verb and move on.
 
-### Monoculture
+### When the verbs stop fitting
 
-`ZK029` reports when one verb accounts for most of the links in a vault. Sometimes that is
-true — a vault about one line of argument can be almost all `extends` — and sometimes it
-means the taxonomy is finer than the way you actually think. The honest responses are to
-accept it (and record why in `SCHEMA.md`) or to merge verbs, not to keep assigning verbs you
-do not believe.
+A vault where almost every link uses one verb is worth a look: either it is genuinely about
+one line of argument, or the verb list is finer than the way you actually think, and the
+verbs are being assigned rather than chosen. Nothing reports this. It was `ZK029` until v2,
+as a ratio against a ceiling, and the ratio was an opinion — a share of links that is honest
+in one vault is evasion in another. The judgement is yours now, and the observable is in the
+report: `metrics.verb_distribution` counts the links by verb. Read it, and if it says what
+you already feared, merge the verbs or accept them in `SCHEMA.md` where a reader can see it.
 
 ## Contradictions
 
@@ -118,13 +122,16 @@ A vault that already has notes does not become a Zettelkasten in one pass, and t
 the skill gets uninstalled. The order that works:
 
 1. **Read `SCHEMA.md` and `structure/index.md`.** If the vault has its own conventions,
-   follow them and say what you are following instead of importing these wholesale.
+   follow them and say what you are following instead of importing these wholesale. If it
+   declares no vocabulary, that is not a gap to fill in for it: report what the linter says
+   and leave the declaration to the vault's owner.
 2. **Lint, then baseline.** Hundreds of findings on an existing vault is the expected
    result. Record the baseline rather than fixing them all, and read the report as a map of
    where the vault is uneven.
-3. **Fix the structural errors first** — broken links, bad verbs, missing fields. They are
+3. **Fix the structural errors first** — broken references, broken identity, dates. They are
    mechanical and they make every later measurement trustworthy.
-4. **Then the orphans**, in batches, with proposed links rather than a list of complaints.
+4. **Then the isolated notes**, in batches, with proposed links rather than a list of
+   complaints.
 5. **Adopt the format for new notes immediately**, and convert old notes only when you are
    already editing them for another reason.
 
@@ -132,24 +139,53 @@ Do not convert the whole vault before writing anything new in it. The compoundin
 starts once new notes are arriving in the new format, and a conversion project with no
 arrivals is the most common way this ends.
 
-## Thresholds
+## The vocabulary
 
-The keys in `SCHEMA.md`'s frontmatter, prefixed `lint_`, with their defaults:
+Six dimensions, declared in `SCHEMA.md`'s frontmatter as flat lists. Each one is checked
+against the notes, and each is independent of the others:
 
-| Key | Default | What it gates |
-|---|---|---|
-| `lint_oversized_note_words` | 800 | the length hint (`ZK023`) |
-| `lint_multi_idea_sections` | 3 | how many sections count as a split candidate (`ZK030`) |
-| `lint_multi_idea_section_words` | 40 | how long a section must be to count |
-| `lint_verb_monoculture_ratio` | 0.6 | the share one verb may hold (`ZK029`) |
-| `lint_verb_monoculture_min_links` | 20 | below this, the ratio is not measured |
-| `lint_stale_draft_days` | 90 | how long a `draft` or `seed` may sit (`ZK017`) |
-| `lint_inbox_stale_days` | 30 | how long a capture may sit (`ZK031`) |
-| `lint_log_rotation_entries` | 500 | when to rotate the log (`ZK032`) |
-| `lint_provenance_min_sources` | 3 | when the marker check applies (`ZK024`) |
-| `lint_provenance_min_words` | 25 | how long a paragraph must be to need a marker |
+| Dimension | What it declares |
+|---|---|
+| `tags` | the subjects this vault writes about |
+| `required_fields` | the frontmatter keys every note must carry |
+| `types` | the kinds of note this vault keeps |
+| `statuses` | the stages a note moves through |
+| `confidences` | how sure a note is allowed to say it is |
+| `verbs` | the link verbs this vault uses |
 
-Change one only when the vault's own practice justifies it, and change it in `SCHEMA.md`
-rather than in your head: a threshold nobody can read is a threshold nobody can argue with.
-The linter reports where each value came from, so a threshold that silently reverted to its
-default is visible in the JSON.
+One check reads them — `ZK003` — and it reports one finding per note per violation.
+
+**An absent dimension is not checked, and it is not defaulted.** That is the rule that makes
+the rest safe: `init` scaffolds a starting declaration into every new vault, but the linter
+holds no copy of it, and a vault that declares nothing is judged on nothing. A vault carried
+in from another tool is not wrong for calling its notes `essay` rather than `permanent`; it
+is simply not asked. The trade is real and worth stating: an undeclared dimension is an
+unguarded one, so declare the ones you care about.
+
+The JSON reports which dimensions were read and where each came from, so a declaration that
+silently stopped being parsed — a typo in a key name, a nested mapping the subset parser
+refuses — is visible in the output rather than inferred from a shorter report.
+
+```json
+"declared": {"statuses": ["draft", "seed"], "tags": ["method"]},
+"declared_sources": {
+  "tags": "SCHEMA.md", "statuses": "SCHEMA.md", "types": "not declared",
+  "confidences": "not declared", "required_fields": "not declared", "verbs": "not declared"
+}
+```
+
+`verbs` is the one with a consequence beyond conformance: `ZK027` obliges a `contradicts`
+link to be returned, and it is keyed on that verb. Declare a verb list that leaves
+`contradicts` out — or declare none and never use the word — and there is no reciprocity to
+check, because the vault has no way to say "this disagrees with that" in the first place.
+
+### Writing a declaration
+
+Flat lists, not nested mappings: the linter reads the frontmatter with a deliberately small
+YAML subset that rejects nesting outright, so `tags: [a, b]` parses and a `tags:` followed by
+indented `- a` lines does not. That is the same form `tags:` has always taken here.
+
+Change a list when the vault's own practice justifies it, and change it in `SCHEMA.md` rather
+than in your head: a vocabulary nobody can read is a vocabulary nobody can argue with. If a
+value keeps being reported, the choice is to add it to the list or to stop writing it — the
+one thing that does not work is leaving the finding and the note disagreeing indefinitely.

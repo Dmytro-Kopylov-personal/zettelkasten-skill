@@ -18,8 +18,10 @@ what make the file a reference rather than a list of codes.
 
 from __future__ import annotations
 
+import pathlib
 import re
 import sys
+import tempfile
 
 import pytest
 from conftest import REPO
@@ -28,6 +30,8 @@ sys.path.insert(0, str(REPO / "skill" / "scripts"))
 import zettel_lint  # noqa: E402
 
 REFERENCE = REPO / "skill" / "references" / "lint-checks.md"
+SCHEMA_REFERENCE = REPO / "skill" / "references" / "schema-reference.md"
+TEMPLATE_SCHEMA = REPO / "skill" / "templates" / "SCHEMA.md"
 ANCHOR = re.compile(r'^<a id="(?P<anchor>[a-z0-9-]+)"></a>\s*$', flags=re.MULTILINE)
 
 ENTRY_LABELS = ("**Fires when**", "**Fix:**", "**By hand:**")
@@ -87,7 +91,7 @@ def test_every_code_the_linter_can_report_has_a_section():
 def test_there_are_exactly_as_many_sections_as_codes():
     """Belt and braces with the set comparison above: a duplicate anchor with a missing
     section would still produce the right *set* while leaving a code undocumented."""
-    assert len(anchors()) == len(zettel_lint.SEVERITIES) == 32
+    assert len(anchors()) == len(zettel_lint.SEVERITIES) == 15
 
 
 @pytest.mark.parametrize("code", sorted(zettel_lint.SEVERITIES))
@@ -175,42 +179,72 @@ def test_no_reference_ships_unlinked():
     assert not orphaned, f"nothing points at {sorted(orphaned)}"
 
 
-# --- the thresholds, which are written down in three places ---------------------------
-
-THRESHOLD_ROW = re.compile(r"^\|\s*`lint_(?P<key>[a-z_]+)`\s*\|\s*(?P<value>[\d.]+)\s*\|", re.M)
-TEMPLATE_LINE = re.compile(r"^#\s*lint_(?P<key>[a-z_]+):\s*(?P<value>[\d.]+)\s*$", re.M)
+# --- the declaration, which is written down in three places ---------------------------
 
 
-def documented_thresholds() -> dict[str, float]:
-    """The table in `schema-reference.md`, keyed without the `lint_` prefix."""
-    text = (REPO / "skill" / "references" / "schema-reference.md").read_text(encoding="utf-8")
-    return {match.group("key"): float(match.group("value")) for match in THRESHOLD_ROW.finditer(text)}
+DIMENSION_ROW = re.compile(r"^\|\s*`(?P<key>[a-z_]+)`\s*\|", re.M)
 
 
-def templated_thresholds() -> dict[str, float]:
-    """The commented defaults in the SCHEMA.md template the init protocol copies."""
-    text = (REPO / "skill" / "templates" / "SCHEMA.md").read_text(encoding="utf-8")
-    return {
-        match.group("key"): float(match.group("value")) for match in TEMPLATE_LINE.finditer(text)
-    }
+def documented_dimensions() -> set[str]:
+    """The six dimension names, as the reference's own table lists them."""
+    return {match.group("key") for match in DIMENSION_ROW.finditer(SCHEMA_REFERENCE.read_text("utf-8"))}
 
 
-def test_the_default_thresholds_are_documented_and_the_document_is_right():
-    """Three copies exist: the linter's table, the reference's table, and the template's
-    commented defaults. A threshold that differs between them is a vault being judged by a
-    rule its own `SCHEMA.md` does not describe."""
-    defaults = {key: float(value) for key, value in zettel_lint.DEFAULT_CONFIG.items()}
-    assert documented_thresholds() == defaults
-    assert templated_thresholds() == defaults
+def templated_declaration() -> dict[str, list[str]]:
+    """The declaration the scaffold writes, read by the linter's own parser.
+
+    Deliberately not a regex over the template. The template becomes a vault's `SCHEMA.md`,
+    and the only question that matters is whether the linter reads a declaration out of it —
+    a regex would agree with itself while the parser found nothing, which is the failure the
+    control below exists to name.
+    """
+    with tempfile.TemporaryDirectory() as directory:
+        root = pathlib.Path(directory)
+        (root / "SCHEMA.md").write_bytes(TEMPLATE_SCHEMA.read_bytes())
+        return zettel_lint.read_declaration(root)
 
 
-def test_the_threshold_parsers_would_notice_a_missing_row():
-    """Control: both parsers key on a pattern, and a pattern that matched nothing would
-    make the comparison above pass with an empty dict on both sides."""
-    defaults = {key: float(value) for key, value in zettel_lint.DEFAULT_CONFIG.items()}
-    assert len(defaults) == 10
-    assert len(documented_thresholds()) == 10
-    assert len(templated_thresholds()) == 10
+def test_the_scaffold_ships_a_declaration_the_linter_can_read():
+    """Init copies this file into a new vault, so it is the first thing `ZK003` ever reads.
+
+    A misspelled dimension name would leave the new vault with that dimension silently
+    unchecked, and nothing in the report would say so — it would simply be about four
+    dimensions instead of five. `tags` is deliberately not among them; the test below says
+    why.
+    """
+    declared = templated_declaration()
+    assert set(declared) == set(zettel_lint.VOCABULARY_DIMENSIONS) - {"tags"}, (
+        f"the template declares {sorted(declared)}"
+    )
+    assert all(declared.values()), declared
+
+
+def test_the_templates_empty_tag_list_is_the_absence_of_a_declaration():
+    """`tags: []` in the scaffold is not the claim that no tags are legal.
+
+    The scaffold cannot know what a vault is about — its domain is literally `unset` — so it
+    must not invent a taxonomy. An empty list is how a dimension goes undeclared, and the
+    whole point of the v2 rule is that undeclared means unjudged rather than wrong.
+    """
+    assert "tags" not in templated_declaration()
+    assert "tags: []" in TEMPLATE_SCHEMA.read_text("utf-8")
+
+
+def test_every_dimension_the_linter_reads_is_documented_and_none_are_invented():
+    """The linter reads six names; the reference must name those six and no others.
+
+    This is what replaced the old three-way threshold check. The property is the same —
+    the rule a vault is judged by must be the rule its own documentation describes — but it
+    is now about which dimensions exist rather than which numbers they default to.
+    """
+    assert documented_dimensions() == set(zettel_lint.VOCABULARY_DIMENSIONS)
+
+
+def test_the_dimension_parsers_would_notice_a_missing_row():
+    """Control: a pattern that matched nothing would make the comparison above pass with
+    two empty sets on both sides."""
+    assert len(documented_dimensions()) == 6
+    assert len(templated_declaration()) == 5
 
 
 # --- the limits that are recorded rather than silently omitted ------------------------

@@ -31,8 +31,9 @@ from conftest import FIXTURES, REPO
 sys.path.insert(0, str(REPO / "skill" / "scripts"))
 import zettel_lint  # noqa: E402
 
-#: Every fixture's dates sit within a few days of this, or far enough in the past to be
-#: stale by any threshold. Pinning it makes the whole module independent of the real clock.
+#: Every fixture's dates sit within a few days of this. No check reads the clock in v2 —
+#: that is asserted in `test_lint_contract.py` by linting the same vault at two dates — so
+#: pinning it here is about making the report's own `now` field stable, not the findings.
 NOW = dt.date(2026, 9, 28)
 
 FIXTURE_NAMES = [
@@ -42,8 +43,9 @@ FIXTURE_NAMES = [
     "vault_minimal",
     "vault_trap",
     "vault_hostile",
-    "vault_monoculture",
     "vault_regressions",
+    "vault_foreign",
+    "vault_resolution",
     "not_a_vault",
 ]
 
@@ -52,9 +54,9 @@ def expectation(name: str) -> dict:
     return json.loads((FIXTURES / name / "expected.json").read_text(encoding="utf-8"))
 
 
-def lint(name: str, *, fail_on: str = zettel_lint.ERROR, overrides: dict | None = None):
+def lint(name: str, *, fail_on: str = zettel_lint.ERROR):
     """(document, exit code), exactly as the CLI computes them."""
-    return zettel_lint.lint_vault(FIXTURES / name, overrides or {}, NOW, set(), fail_on)
+    return zettel_lint.lint_vault(FIXTURES / name, NOW, set(), fail_on)
 
 
 def keys(document: dict) -> Counter:
@@ -156,11 +158,22 @@ def run_without(code: str, fixture: str):
 def test_the_registry_really_is_what_it_says():
     """Guard for the mutation test below: if this fails, the mutations proved nothing."""
     assert tuple(name for name, _ in zettel_lint.CHECKS) == tuple(sorted(zettel_lint.SEVERITIES))
-    assert len(zettel_lint.CHECKS) == len(zettel_lint.SEVERITIES) == 32
+    assert len(zettel_lint.CHECKS) == len(zettel_lint.SEVERITIES) == 15
+
+    # v2 retired seventeen numbers and promised never to reuse them. A code that came back
+    # under a retired number would be the one mistake the numbering rule exists to prevent,
+    # so the absence is asserted rather than assumed.
+    retired = {
+        "ZK004", "ZK007", "ZK009", "ZK011", "ZK013", "ZK016", "ZK017", "ZK018",
+        "ZK020", "ZK021", "ZK023", "ZK024", "ZK025", "ZK029", "ZK030", "ZK031", "ZK032",
+    }
+    assert not retired & set(zettel_lint.SEVERITIES), "a retired code was reused"
+    assert len(zettel_lint.SEVERITIES) + len(retired) == 32, "the v1 code set was 32"
 
 
 # Every (fixture, code) pair where a code's findings can be attributed. vault_defects carries
-# 29 of the 32 codes; ZK001, ZK002 and ZK029 live in fixtures of their own.
+# 13 of the 15 codes; ZK001 and ZK002 need a directory that is not a vault and a file that
+# cannot be parsed, so they live in fixtures of their own.
 MUTATION_CASES = [
     (name, entry[0])
     for name in FIXTURE_NAMES
@@ -219,32 +232,37 @@ def test_the_severity_table_covers_every_check():
     assert set(zettel_lint.SEVERITIES) == {code for code, _ in zettel_lint.CHECKS}
 
 
-# --- the config layers the fixtures depend on ----------------------------------------
+# --- the declaration the fixtures depend on ------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "key, value",
-    [
-        ("oversized_note_words", 80),
-        ("multi_idea_section_words", 10),
-        ("log_rotation_entries", 5),
-    ],
-)
-def test_vault_defects_lowers_its_thresholds_through_schema_md(key, value):
-    """The corpus's three lowered thresholds must come from SCHEMA.md, not a typo.
+def test_vault_defects_declares_its_vocabulary_through_schema_md():
+    """The corpus's four conformance defects must be defects against SCHEMA.md.
 
-    If the key were misspelled, the value would silently fall back to the default and the
-    fixture would be testing a different threshold than its manifest claims.
+    If a dimension name were misspelled it would silently become "not declared", and the
+    fixture would be testing a smaller declaration than its manifest claims — while still
+    reporting the same four findings, because the values it does check are unchanged. The
+    full declaration is pinned for that reason, not for its own sake.
     """
     document, _ = lint("vault_defects")
-    assert document["config"][key] == value
-    assert document["config_sources"][key] == "SCHEMA.md"
+    assert document["declared"] == {
+        "confidences": ["high", "low", "medium"],
+        "required_fields": ["created", "id", "status", "title", "type"],
+        "statuses": ["archived", "draft", "evergreen", "seed"],
+        "tags": ["cognition", "memory", "method"],
+        "types": ["permanent", "source", "structure"],
+        "verbs": ["applies", "contradicts", "extends", "source", "supersedes", "supports"],
+    }
+    assert set(document["declared_sources"]) == set(zettel_lint.VOCABULARY_DIMENSIONS)
+    assert set(document["declared_sources"].values()) == {"SCHEMA.md"}
 
 
-def test_the_command_line_outranks_schema_md():
-    """The other half of the same mechanism, and the only place overrides are ordered."""
-    document, _ = lint("vault_defects", overrides={"oversized_note_words": 5})
-    assert document["config"]["oversized_note_words"] == 5
-    assert document["config_sources"]["oversized_note_words"] == "command line"
-    assert document["config"]["stale_draft_days"] == 90  # untouched by the override
-    assert document["config_sources"]["stale_draft_days"] == "default"
+def test_a_vault_that_declares_nothing_is_reported_dimension_by_dimension():
+    """The other direction, and the reason `declared_sources` is not just an omission.
+
+    An empty `declared` plus six named dimensions is the report saying *it looked and stood
+    down*. A missing key would say nothing at all, and the two must not be the same output.
+    """
+    document, _ = lint("vault_foreign")
+    assert document["declared"] == {}
+    assert set(document["declared_sources"]) == set(zettel_lint.VOCABULARY_DIMENSIONS)
+    assert set(document["declared_sources"].values()) == {"not declared"}

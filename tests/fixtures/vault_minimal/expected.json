@@ -1,19 +1,14 @@
 {
-  "_comment": "Three notes and nothing else: no raw/, no structure/, no inbox/, no tag taxonomy. Nothing is wrong with it, and eleven checks have no surface to read at all — they must be reported as not applicable by name, which is the difference between a vault this small being clean and a vault this small being unexamined.",
+  "_comment": "Three notes and nothing else: no raw/, no structure/, no inbox/, and a SCHEMA.md that declares no vocabulary. Nothing is wrong with it, and six checks have no surface to read at all — they must be reported as not applicable by name, which is the difference between a vault this small being clean and a vault this small being unexamined. ZK003 is one of the six, and deliberately so: a vault that declares no vocabulary is not judged against one.",
   "exit": {"error": 0, "warn": 0, "info": 0},
   "metrics": {"notes": 3, "raw_sources": 0, "links": 6, "orphan_rate": 0.0},
   "not_applicable": [
+    "ZK003",
     "ZK012",
-    "ZK013",
     "ZK014",
-    "ZK016",
-    "ZK018",
     "ZK019",
-    "ZK024",
     "ZK026",
-    "ZK027",
-    "ZK029",
-    "ZK031"
+    "ZK027"
   ],
   "findings": []
 }

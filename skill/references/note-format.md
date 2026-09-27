@@ -63,9 +63,15 @@ links:
 | `updated` | no | `YYYY-MM-DD`, never earlier than `created` |
 | `sources` | for anything drawn from a source | paths under `raw/` |
 | `confidence` | no | `low`, `medium`, `high` |
-| `tags` | no | from the taxonomy in `SCHEMA.md` |
+| `tags` | no | from the tags list in `SCHEMA.md` |
 | `links` | yes | a list of `target` + `verb` |
-| `provenance` | no | `note` to opt out of the inline-marker check (`ZK024`) |
+
+The **Required** column is this vault's own starting declaration, not a rule the linter
+carries: `required_fields`, `types`, `statuses`, `confidences` and `verbs` are all read from
+`SCHEMA.md`, and the values above are what `init` scaffolds there. Edit that file and the
+table above stops describing your vault — which is the intended direction of travel. A field
+the linter imposes regardless is the filename, the `id` agreement and a body; everything else
+in this table is yours to change.
 
 Use the YAML subset the linter can read: plain and quoted scalars, flow lists, block
 lists, and lists of single-key maps. **Tabs, anchors, aliases, block scalars, flow mappings
@@ -88,8 +94,11 @@ vault of claims becomes an argument.
 - `evergreen` — you would defend it as written.
 - `archived` — retired, kept for the record, no longer maintained.
 
-`draft` and `seed` notes older than the vault's stale threshold are reported as `ZK017`,
-which is a prompt to promote, split or archive, not a deadline.
+A note can sit in `draft` or `seed` indefinitely without being reported. That used to be
+`ZK017`, a nudge after a fixed number of days, and the number was the opinion — nothing about
+a tenth day makes a note ready and nothing about a ninetieth makes it stale. The prompt to
+promote, split or archive is still worth acting on; it just is not something the linter can
+tell you.
 
 ## The body
 
@@ -114,7 +123,9 @@ One idea, argued in one place, with citations as you go.
   authoritative — when the two drift, the body is what gets corrected (`ZK028`).
 
 Notes shorter than a paragraph are usually a title with no argument; notes with several
-substantial `##` sections are usually several ideas wearing one title (`ZK030`).
+substantial `##` sections are usually several ideas wearing one title. The second of those
+was `ZK030` until v2 — a section count and a word count deciding it — and the shape is still
+worth noticing, by eye, which is the only instrument that ever really decided it.
 
 ## Links
 
@@ -129,9 +140,11 @@ Every link is a `target` and a `verb`. The target is a slug; the verb is one of 
 | `applies` | this note puts the target's idea to use in a particular case |
 | `supersedes` | this note replaces the target, which stays for the record |
 
-Two outbound links is the floor (`ZK010`), not the goal. At least one inbound link is what
-keeps a note reachable (`ZK011`), and links from `structure/` do not count towards it —
-otherwise the index would make every note look connected.
+Two outbound links is the working floor, not the goal, and it is advice rather than a rule:
+the linter reports a note that links to nothing and a note that nothing links to (`ZK010`),
+and a note with exactly one link is reported by neither. Links from `structure/` do not count
+towards reachability — otherwise the index every vault is required to have would make every
+note look connected.
 
 ## Raw sources
 

@@ -138,7 +138,7 @@ nothing else belongs in that folder: the vault root is the boundary of every wri
 ```mermaid
 flowchart TD
   subgraph VAULT["a vault — one folder, nothing else"]
-    SCHEMA["SCHEMA.md<br/>the vault's own rules:<br/>domain · tags · verbs · thresholds"]
+    SCHEMA["SCHEMA.md<br/>the vault's own rules:<br/>domain · tags · verbs · vocabulary"]
     PERM["permanent/<br/>one atomic idea per note<br/>id-slug.md"]
     RAW["raw/articles · raw/papers · raw/notes<br/>captures — immutable, sha256 recorded"]
     INBOX["inbox/<br/>material not yet processed"]
@@ -171,11 +171,12 @@ are what make a folder a vault.** Resolution walks upward looking for all three 
 vault* and exits 2, rather than being linted as an empty vault and reported clean. That distinction
 is the one the `not_a_vault` fixture exists to hold.
 
-`log-archive.md` is the only path not there at the start. It appears when the log passes
-`lint_log_rotation_entries`, because a log that only grows stops being readable and an unread log is
-not a history. `SCHEMA.md` is the other file worth opening first: the linter carries a default for
-every threshold, and a vault's own `SCHEMA.md` overrides them for that vault alone, which is how one
-linter judges two vaults held to different standards.
+`log-archive.md` is the only path not there at the start. It appears when the log stops being
+readable at a glance, because a log that only grows stops being read and an unread log is not a
+history — the judgement is the writer's, and no check counts the entries. `SCHEMA.md` is the other
+file worth opening first: it declares the vault's vocabulary, and the linter judges the notes
+against that declaration and against nothing else, which is how one linter works in two vaults
+that use different words for the same things.
 
 ## How it holds together at run time
 
@@ -205,8 +206,10 @@ flowchart TD
 
 The loop is deliberately one-directional. The linter reads the vault and reports; it has no
 `--fix` and no write path at all. A fix mode would be a second write path around ingest's
-propose-then-approve contract, and the findings most worth acting on — which verb, one idea or
-two — are the ones no script can decide.
+propose-then-approve contract, and the judgements most worth acting on — which verb, one idea or
+two — are the ones no script can decide. In v2 they stopped being checks as well as stopping
+being fixable: they never were facts about a file, and the codes that pretended otherwise are
+gone.
 
 Two properties of that loop are structural rather than conventional. `raw/` is never written
 after capture, so hash drift is remedied by re-ingesting, never by editing the digest. And the

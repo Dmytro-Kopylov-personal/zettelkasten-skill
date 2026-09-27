@@ -45,17 +45,18 @@ ordinary, valid, linked notes. They must produce nothing.
 | `permanent/202609280910-crlf-one.md` | A Windows-authored note: parses, links, reports nothing | None |
 | `permanent/202609280911-crlf-two.md` | The same, and the cycle closes | None |
 | `permanent/202609280912-crlf-three.md` | The same | None |
-| `SCHEMA.md` | No `tags:` key, so `ZK016` is not applicable | None |
+| `SCHEMA.md` | Declares no vocabulary, so `ZK003` is not applicable | None |
 | `log.md` | One dated entry | None |
 
 This is the fixture's most important assertion. CRLF is tolerated by contract ("a Windows-
 authored note is still a note"), and there was a real bug here: before `FRONTMATTER_OPEN`
 and `FRONTMATTER_CLOSE` learned about `\r`, a CRLF file had no recognisable frontmatter at
-all and produced five `ZK003`s — the exact "loud wrong answer" this file is about. The three
-CRLF notes fail the suite if that ever comes back.
+all and produced five conformance findings — the exact "loud wrong answer" this file is
+about. The three CRLF notes fail the suite if that ever comes back.
 
-`ZK014`, `ZK019` and `ZK026` are not applicable (there is no `raw/`), and `ZK029` is not
-applicable at 6 links. Everything else runs and reports clean.
+Six checks are not applicable: `ZK003` (no vocabulary is declared), `ZK012` (no
+`structure/index.md`), `ZK014` and `ZK019` and `ZK026` (there is no `raw/`), and `ZK027` (no
+note uses the `contradicts` verb). Everything else runs and reports clean.
 
 ## What this fixture does not test
 

@@ -1,0 +1,7 @@
+{
+  "_comment": "A vault that declares no vocabulary, using a vocabulary from elsewhere. Hand-written before the linter ran: the assertion is that the report is EMPTY — no finding on any of the foreign values — and that ZK003 is named as not applicable rather than counted as a pass. Under v1 this same input produced conformance findings on every note.",
+  "exit": {"error": 0, "warn": 0, "info": 0},
+  "metrics": {"notes": 3, "raw_sources": 1, "links": 6, "orphan_rate": 0.0},
+  "not_applicable": ["ZK003", "ZK027"],
+  "findings": []
+}

@@ -28,7 +28,8 @@ enforceable if something other than the agent's judgment checks them.
 | V7 | **`claude plugin validate` reads exactly one skill layout, and is blind to format.** Its help promises "the skills, agents, and commands in a directory", but it descends only into the **default `skills/` directory**. A `SKILL.md` at the plugin root, or in a directory named by the `skills` key, is never opened: `contents: []`, exit 0 under `--strict`. Inside the directory it does read, the checks are real but shallow — a missing description, a missing frontmatter block and unparseable YAML each fail `--strict`, while a non-kebab name, angle brackets in the description and an unrecognised `version` key pass identically to a good skill. | P6's gate as originally written — "`claude plugin validate --strict` exits 0" — is struck, because this repo ships the skill in the one layout the validator never opens (`skill/`, declared via the `skills` key), so the gate could not have inspected the thing it was gating. Replaced with two instruments calibrated in both directions: `quick_validate.py`, which fails on the broken skill and names the offending key, and discovery, proven by the `user: N` skill-load count moving 1 → 0 → 1 as the skill is installed, parked and restored. The remedy for the validator is upstream. |
 | V8 | **A grader can pass without the skill, and the ablation still looks clean.** Both P6 cases scored 1.00 with and below threshold without — but reading the kept run trees, each delta rests on exactly one grader, and that grader tests a *naming convention*: `vault/permanent/*.md` in one case, `zettelkasten/SCHEMA.md` in the other. With no skill loaded, the agent still indexed, still logged, still linked seven notes, and still contained itself to a single folder. | The flags-nothing failure one layer up: not a check that cannot fail, but a check that cannot *discriminate*. An ablation whose baseline arm scores 0.67–0.75 is mostly measuring the prompt. Cases must carry at least one grader whose answer depends on something only the body supplies — an id↔filename match, a `sha256` on the captured source, a verb from the closed set, a `sources:` field — none of which a plausible-looking unskilled vault has. Recorded in `docs/verification.md`; the run traces themselves are not shipped. |
 | V9 | **The loader and the validator disagree in both directions, and a skill with no `description` does not load at all.** Measured from the loader's own init event: a `SKILL.md` at the plugin root loads, with or without a `skills` key, and so does a directory named by `skills` — the two layouts `validate` never inspects. The loader is stricter in exactly one place, holding every other variable constant: the same directory with the same `name` loads when a description is present and vanishes from the `skills` array when it is absent, at the root and in a declared directory alike. | The V2 discovery surface has a second failure mode on a different platform, and a louder one — not a truncated trigger string, but no skill at all. Every render already requires a non-empty description and the frontmatter conformance suite asserts it per platform, so nothing changes; recorded because the reason is now known rather than assumed, and because it is the one loader rule stricter than the validator beside it. |
-| V10 | **`permanent/glob("*.md")` was not recursive while `raw/rglob` and `inbox/rglob` were, so a note one directory deep was invisible.** `load_vault` collected it as nothing, `summary.notes` read 0, no check had anything to fire on, and the run exited 0 — "0 notes, no findings", which reads as a clean vault. Obsidian users file notes into subdirectories as a matter of course, and the miss is the one failure mode this repository exists to catch: a report of success that is indistinguishable from the absence of a report. | `permanent/` now recurses, and `structure/` deliberately does not — its files have fixed names and fixed roles, so nesting has no meaning to give one, and recursion there bought nothing while making a nested `index.md` a candidate for *the* index. Link resolution moved from string comparison to `Vault.resolve()`, which accepts every spelling Obsidian writes (`note`, `note.md`, `sub/note`, `permanent/sub/note`) and returns the *note*; the inbound count keys on that note rather than on the string, or a long-form link would have produced a false orphan in both ZK011 and the reported orphan rate. `vault_nested` calibrates all four mutations, one of which found that the `.md` branch had been unexercised in both the old code and the new. |
+| V10 | **`permanent/glob("*.md")` was not recursive while `raw/rglob` and `inbox/rglob` were, so a note one directory deep was invisible.** `load_vault` collected it as nothing, `summary.notes` read 0, no check had anything to fire on, and the run exited 0 — "0 notes, no findings", which reads as a clean vault. Obsidian users file notes into subdirectories as a matter of course, and the miss is the one failure mode this repository exists to catch: a report of success that is indistinguishable from the absence of a report. | `permanent/` now recurses, and `structure/` deliberately does not — its files have fixed names and fixed roles, so nesting has no meaning to give one, and recursion there bought nothing while making a nested `index.md` a candidate for *the* index. Link resolution moved from string comparison to `Vault.resolve()`, which accepts every spelling Obsidian writes (`note`, `note.md`, `sub/note`, `permanent/sub/note`) and returns the *note*; the inbound count keys on that note rather than on the string, or a long-form link would have produced a false orphan in both the isolation check and the reported orphan rate. `vault_nested` calibrates all four mutations, one of which found that the `.md` branch had been unexercised in both the old code and the new. |
+| V11 | **Ten of the linter's thirty-two checks decided by a number, and not one of those numbers had a provenance anywhere in the repo.** 800 words, 90 days in `draft`, 20 links before a vault is "monoculture", a `log.md` past 500 entries. They were bare literals in one dict; `references/schema-reference.md` documented their defaults and nothing documented where the defaults came from, because nothing did — they were invented, and shipped at the same tier as "this reference resolves to no file". A reader had no way to tell which findings were facts about their vault and which were the tool's taste. | The rule this release adopts: **a check may assert only a fact about the vault's own files; if it needs a number to decide, it is an opinion and does not ship.** Seventeen codes retired, fifteen remain, and a retired number is never reused — so `ZK019` means the same thing in every version and the gaps are honest. The ideas were not all wrong, which is the point: what was wrong was a linter claiming to have measured something. Where an idea survives it survives as prose advice in the references, where a judgement call belongs. The *body* of the skill still carries numbers — "at least two outbound links" is advice to a writer — and that line is the whole distinction. |
 
 ## Assembly: seams, not forks
 
@@ -99,14 +100,26 @@ re-ingest.
 
 **A report must not overclaim.** `parse_failures[]` and `skipped_checks[]` are mandatory
 fields of the JSON contract, so a check that could not run says so instead of disappearing
-into a clean result. `ZK011` (orphan) excludes `structure/` from the inbound count —
-otherwise `index.md` cures every orphan and the check is provably vacuous.
+into a clean result. `ZK010` (isolation) excludes `structure/` from the inbound count —
+otherwise `index.md` cures every isolated note and the check is provably vacuous — and it
+reports either direction, because "links out to nothing" and "nothing links to it" are the
+same defect seen from the two ends.
 
-`ZK024` (provenance gaps) ships as `info` with its false positives stated rather than
-discovered later: a synthesis paragraph legitimately drawing on all sources at once,
-verbatim quotations, and word counts that under-count unspaced languages. The deterministic
-half of provenance — *do the cited files exist* — is `ZK018` at `error`, and that is the
-half worth failing CI on.
+**One resolver answers for all four ways a note names a target.** A link, a `sources:`
+entry, a `^[raw/...]` marker and an index entry used to be four separate notions of "does
+this exist" — three of them a literal `is_file()` at three call sites, one a hand-rolled
+slug match. They agreed by luck rather than by construction, and they disagreed in a way
+nobody had noticed: a `sources:` path written without its extension resolved under two of
+the four and not the others. `vault_resolution` pins both directions of the fixed behaviour
+— the extension-less target that exists resolves, and the one that does not still fails.
+
+**The vocabulary is the vault's.** `SCHEMA.md` declares six dimensions as flat lists, and
+`ZK003` judges the notes against those and nothing else. **An absent dimension means that
+dimension is not applicable — never that a default applies.** That is what makes the rule
+safe for a vault carried in from another tool: a vault that calls its notes `essay` rather
+than `permanent` is not wrong, it is simply not asked, and `vault_foreign` is the fixture
+that keeps it that way. The trade is stated where it bites: an undeclared dimension is an
+unguarded one.
 
 ## Verification
 
@@ -125,9 +138,13 @@ identical from the inside.
   inbound link comes from `index.md` — it must still be flagged, so the trap cuts both ways.
 - `vault_hostile` proves exclusion rather than vacuous passing: one `ZK002` per unsupported
   construct, and nothing else from that file.
-- `vault_minimal` names the checks that had no surface to examine, and `vault_monoculture`
-  pins the one vault-level statistic — a check whose input is absent is reported as
-  not-applicable, never counted as a pass.
+- `vault_minimal` names the checks that had no surface to examine, and `vault_foreign` pins
+  the declaration's own version of the same property — a check whose input is absent is
+  reported as not-applicable, never counted as a pass, whether the missing input is a
+  surface or a declaration.
+- **The clock is not an input to the answer.** One vault linted at two dates a year apart
+  must produce identical reports, `now` aside — the invariant that replaced every check
+  which read the calendar, asserted rather than asserted-about.
 - `references/lint-checks.md` is asserted against the *emitter*: each code is run through
   `Finding.as_dict()` and the resulting `doc` string must resolve to a section headed with
   that code, at the severity the registry assigns it.

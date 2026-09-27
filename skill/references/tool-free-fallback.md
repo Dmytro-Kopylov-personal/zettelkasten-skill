@@ -8,8 +8,8 @@ running bundled scripts, a vault the tool cannot read. In that case the checks d
 disappear — they become something you do by hand, more slowly and less reliably. What must
 not happen is that they become nothing, and the report comes back saying "clean".
 
-**"Clean" is a claim about coverage, not about confidence.** A manual pass that ran eight of
-thirty-two checks is a report of eight checks, and it says so.
+**"Clean" is a claim about coverage, not about confidence.** A manual pass that could not
+compute a digest ran fourteen of the fifteen checks, and it says so.
 
 ## The manual pass, in order
 
@@ -24,61 +24,61 @@ Read the frontmatter of every note.
 |---|---|
 | `permanent/`, `SCHEMA.md` or `log.md` missing | `ZK001` |
 | frontmatter that will not parse — tabs, anchors, block scalars, a duplicate key | `ZK002` |
-| a required field absent or empty: `id`, `title`, `type`, `status`, `created` | `ZK003` |
-| a value outside its vocabulary (`type`, `status`, `confidence`) | `ZK004` |
+| a field the vault declares required that is absent or empty, or a value outside the vocabulary its own `SCHEMA.md` declares | `ZK003` |
 | a date that is not `YYYY-MM-DD`, or `updated` before `created` | `ZK005` |
-| the filename's twelve digits not matching `id` | `ZK006` |
-| two notes sharing an `id` | `ZK007` |
-| a link target, frontmatter or `[[wikilink]]`, that resolves to no note | `ZK008` |
-| a verb outside the six | `ZK009` |
-| fewer than two outbound links | `ZK010` |
+| the filename's twelve digits not matching `id`, or two notes sharing an `id` | `ZK006` |
+| a reference that resolves to nothing — a link target, a `sources:` path, a `^[raw/...]` marker | `ZK008` |
 
-`ZK001`, `ZK003` and `ZK006` are the ones to do first, because every later count depends on
-the note set being right.
+**`ZK003` checks only what the vault declares.** Read the six lists in `SCHEMA.md` —
+`required_fields`, `types`, `statuses`, `confidences`, `tags`, `verbs` — and compare the notes
+against those. A dimension the file does not declare is not a defect and must not be reported
+as one, however odd the note looks: a vault that calls its notes `essay` is not wrong.
+
+`ZK001`, `ZK002` and `ZK006` are the ones to do first, because every later check depends on
+the note set being right, and a note whose frontmatter will not parse is invisible to
+everything downstream of it.
 
 ### 2. Decay: the vault is drifting
 
 | Look for | Code |
 |---|---|
-| a note nothing links to — links from `structure/` do not count | `ZK011` |
+| a note nothing links to, a note that links to nothing, or both — links from `structure/` do not count | `ZK010` |
 | the index missing a note, or naming one that is not there | `ZK012` |
-| a `sources:` path that is not a file | `ZK013` |
 | a `raw/` file with no `sha256` | `ZK014` |
 | a note with no body | `ZK015` |
-| a tag outside the taxonomy in `SCHEMA.md` | `ZK016` |
-| a `draft` or `seed` older than the vault's stale threshold | `ZK017` |
-| a `^[raw/...]` marker pointing at nothing | `ZK018` |
 | a `raw/` digest that no longer matches its file | `ZK019` |
-| a self-link, or two links to one target | `ZK020` |
-| two notes whose titles slugify the same way | `ZK021` |
 | a `log.md` bullet with no date | `ZK022` |
 
-**The orphan pass is the one that needs a system.** List every note's slug, then, for each
+**The isolation pass is the one that needs a system.** List every note's slug, then, for each
 note, list what it links to; invert that into an inbound map. Reading notes one at a time and
-trying to remember who mentioned them is how orphans survive a manual lint. Ignore links that
-come only from `structure/`.
+trying to remember who mentioned them is how isolated notes survive a manual lint. Ignore
+links that come only from `structure/`, and remember that the finding is either direction:
+linking out to nothing counts, and so does having nothing link in.
 
-**The digest pass needs a digest.** If you have no way to compute one, say that
-`ZK014` and `ZK019` were not run rather than reporting them as passing. A wrong digest is
-worse than a missing one, because the drift check will then fire on everything.
+**The digest pass needs a digest.** If you have no way to compute one, say that `ZK014` and
+`ZK019` were not run rather than reporting them as passing. A wrong digest is worse than a
+missing one, because the drift check will then fire on everything.
+
+**A reference is resolved by name, and one resolver answers for all four surfaces.** A note
+resolves by its slug wherever it sits, with or without `.md`; a file under `raw/` resolves
+with or without its extension. Everything else is a reference to nothing.
 
 ### 3. Advisory: the vault is telling you something
 
 | Look for | Code |
 |---|---|
-| a note past the length threshold | `ZK023` |
-| a long paragraph in a multi-source note with no inline marker | `ZK024` |
-| "and" in a title | `ZK025` |
 | a `raw/` file no note cites | `ZK026` |
 | a `contradicts` link the target does not return | `ZK027` |
 | the body's links disagreeing with the frontmatter | `ZK028` |
-| one verb holding most of the links | `ZK029` |
-| several substantial sections in one note | `ZK030` |
-| a capture sitting in `inbox/` past the stale threshold | `ZK031` |
-| a log past the rotation threshold | `ZK032` |
 
 These are information, not a to-do list. Report them grouped, say which ones you would act
 on and why, and leave the decision with the user.
+
+**Nothing in this pass decides by a number.** No word count, no day count, no share of links.
+If you find yourself reaching for one — "this note is long", "this draft is old", "this vault
+uses one verb too much" — that is a judgement, and it is worth saying. It is not a finding,
+and it must not be reported with a code: there is no code for it any more, and inventing one
+gives an opinion the same authority as a broken reference.
 
 ## Reporting a manual pass
 
@@ -104,10 +104,12 @@ manual pass has no test suite behind it.
 
 Worth saying out loud, because it is the reason to prefer the script:
 
-- **Counting.** Link counts, word counts, verb distributions. People are unreliable at
-  estimating these, and quietly confident about it.
-- **Consistency.** The mechanical checks are exactly the ones you will skip when a vault is
-  large, which is when they matter most.
+- **Exhaustiveness.** Every surviving check is a total comparison — all notes against the
+  index, all references against the file tree, every digest against its bytes. A person does
+  this well for twenty notes and starts sampling at two hundred, which is exactly when the
+  one broken reference is the one that matters.
+- **Consistency.** The mechanical checks are the ones you will skip when a vault is large,
+  which is when they matter most.
 - **Order.** Two runs by hand will not agree on the order of findings, so the diff between
   them is noise.
 

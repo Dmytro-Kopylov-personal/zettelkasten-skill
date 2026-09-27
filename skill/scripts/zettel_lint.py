@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lint a Zettelkasten vault: structural errors, decay, and advisory findings.
+"""Lint a Zettelkasten vault: what the vault's own files say about themselves.
 
 Read-only, single file, standard library only. There is no --fix and no code path in
 this file that opens anything for writing: the script verifies, the agent writes.
@@ -9,6 +9,19 @@ this file that opens anything for writing: the script verifies, the agent writes
     python3 zettel_lint.py hash <file>          # sha256 over the body bytes
 
 Exit codes: 0 clean at --fail-on, 1 findings, 2 usage or vault error.
+
+Every check here asserts a fact about the vault's own files: a reference that resolves to
+nothing, a digest that no longer matches, two notes claiming one identity, a log entry
+with no date on it. A check may not decide by a number. "800 words is too long" and "90
+days without promoting a draft is too long" are opinions; they were once shipped as rules
+with the same authority as the facts beside them, and they are gone. What a vault declares
+about *itself* is checked instead, and only what it declares: the vocabulary in its own
+SCHEMA.md, and nothing this linter would have imposed on it. The line is that the format is
+ours — `id`, `title`, `created`, `updated`, a body, the shape of a link — and the
+vocabulary is the vault's.
+
+One consequence is an invariant worth stating because it is testable: no check reads the
+clock, so two runs over the same bytes report the same findings whenever they are run.
 
 The frontmatter parser is a hand-rolled YAML subset. It is deliberately strict: a
 document it cannot parse is reported as a parse failure and excluded from every check
@@ -29,7 +42,9 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-SCHEMA_VERSION = "1"
+#: Versions the JSON contract, not the plugin: 2 is the release where the code set shrank
+#: and `config`/`config_sources` became `declared`/`declared_sources`.
+SCHEMA_VERSION = "2"
 
 # ---------------------------------------------------------------------------
 # YAML subset
@@ -482,7 +497,6 @@ def parse_file(data: bytes) -> ParsedFile:
 WIKILINK_RE = re.compile(r"\[\[([^\[\]]+)\]\]")
 PROVENANCE_RE = re.compile(r"\^\[([^\]]+)\]")
 FENCE_RE = re.compile(r"^\s{0,3}(```|~~~)")
-ORDERED_ITEM_RE = re.compile(r"^\d+[.)]\s")
 
 
 def strip_code(text: str) -> str:
@@ -598,6 +612,7 @@ class Vault:
     structure: dict[str, str] = field(default_factory=dict)
     missing: list[str] = field(default_factory=list)
     _link_index: dict[str, Note] | None = field(default=None, repr=False)
+    _declared: dict[str, list[str]] | None = field(default=None, repr=False)
 
     @property
     def notes_by_id(self) -> dict[str, Note]:
@@ -617,7 +632,7 @@ class Vault:
         Obsidian writes the shortest unambiguous link and lengthens it only when two notes
         share a basename, so all of these occur in a real vault: `note`, `note.md`,
         `sub/note`, and the vault-relative `permanent/sub/note`. A note's twelve-digit
-        filename is what stops two notes from sharing one, and ZK006/ZK007 check that.
+        filename is what stops two notes from sharing one, and ZK006 checks that.
         """
         if self._link_index is None:
             index: dict[str, Note] = {}
@@ -637,11 +652,17 @@ class Vault:
 
         Resolution is by the note, not by the string, so a link written in any of the
         accepted spellings credits the same note — which is what keeps the inbound count
-        (ZK011) and the orphan rate in the metrics from disagreeing with ZK008.
+        behind ZK010 and the orphan rate in the metrics from disagreeing with ZK008.
         """
         if not target:
             return None
         return self.link_index().get(target)
+
+    def declared_vocabulary(self) -> dict[str, list[str]]:
+        """The vocabulary this vault declares in its own SCHEMA.md; {} if it declares none."""
+        if self._declared is None:
+            self._declared = read_declaration(self.root)
+        return self._declared
 
 
 REQUIRED_VAULT_PATHS = ("permanent", "SCHEMA.md", "log.md")
@@ -705,6 +726,73 @@ def _load_note(path: Path, root: Path) -> Note:
     )
 
 
+#: The dimensions a vault may declare in its own `SCHEMA.md`. There is no default for any
+#: of them: a key that is absent means that dimension is not checked at all, which is the
+#: difference between a foreign vault and a wrong one.
+VOCABULARY_DIMENSIONS = ("tags", "required_fields", "types", "statuses", "confidences", "verbs")
+
+
+def read_declaration(root: Path) -> dict[str, list[str]]:
+    """The vocabulary `<root>/SCHEMA.md` declares, by dimension.
+
+    Flat keys with flow lists — the shape `tags:` has always had. The subset parser rejects
+    nested mappings outright, so a declaration a vault cannot write is not a declaration.
+    A dimension whose key is absent, empty or not a list is left out entirely rather than
+    filled in with something this linter would have preferred.
+    """
+    path = root / "SCHEMA.md"
+    if not path.is_file():
+        return {}
+    frontmatter, _, _, _ = split_with_lines(path.read_bytes())
+    parsed, _, _ = parse_yaml_subset(frontmatter.decode("utf-8", "replace"))
+    if not isinstance(parsed, dict):
+        return {}
+    declared: dict[str, list[str]] = {}
+    for key in VOCABULARY_DIMENSIONS:
+        value = parsed.get(key)
+        if not isinstance(value, list):
+            continue
+        values = sorted({_as_text(item) for item in value if _as_text(item)})
+        if values:
+            # An empty list says "nothing declared yet", not "nothing is legal".
+            declared[key] = values
+    return declared
+
+
+def reference_target(vault: Vault, target: str) -> Note | Path | None:
+    """What a reference points at: the note it names, the file it names, or nothing.
+
+    One notion of resolution for every surface that carries a reference — a frontmatter
+    link, a `[[wikilink]]`, a `sources:` entry, a `^[raw/...]` marker, an entry in the
+    index. Notes resolve through the link index, so every spelling Obsidian accepts
+    credits the same note. Everything else falls back to the filesystem, where a name
+    written without `.md` also resolves to the file beside it: `raw/x` and `raw/x.md` are
+    two spellings of one target, not two answers to one question.
+    """
+    if not target:
+        return None
+    note = vault.resolve(target)
+    if note is not None:
+        return note
+    candidate = vault.root / target
+    if candidate.is_file():
+        return candidate
+    if not target.endswith(".md") and (vault.root / f"{target}.md").is_file():
+        return vault.root / f"{target}.md"
+    return None
+
+
+def reference_key(vault: Vault, target: str) -> str:
+    """A reference's identity for set comparison: the note it resolves to, else its text.
+
+    Two spellings of one note are one reference, which is what stops a Links section
+    written the long way from reading as drift against a frontmatter written the short way.
+    An unresolved target keys on its own text — that is all there is of it.
+    """
+    resolved = reference_target(vault, target)
+    return resolved.relpath if isinstance(resolved, Note) else target
+
+
 # ---------------------------------------------------------------------------
 # Findings and checks
 # ---------------------------------------------------------------------------
@@ -712,30 +800,11 @@ def _load_note(path: Path, root: Path) -> Note:
 ERROR, WARN, INFO = "error", "warn", "info"
 SEVERITY_ORDER = {ERROR: 0, WARN: 1, INFO: 2}
 
-LINK_VERBS = ("extends", "supports", "contradicts", "source", "applies", "supersedes")
-NOTE_TYPES = ("permanent", "source", "structure")
-NOTE_STATUSES = ("draft", "seed", "evergreen", "archived")
-CONFIDENCES = ("low", "medium", "high")
-REQUIRED_FIELDS = ("id", "title", "type", "status", "created")
-
 ID_IN_FILENAME_RE = re.compile(r"^(\d{12})-(.+)$")
 #: Anchored, for validating that a whole string is a date.
 ISO_DATE_RE = re.compile(r"^\d{4}-\d\d-\d\d$")
 #: Unanchored, for finding a date inside a line — a log entry carries more than a date.
 ISO_DATE_FIND = re.compile(r"\d{4}-\d\d-\d\d")
-
-DEFAULT_CONFIG: dict[str, object] = {
-    "stale_draft_days": 90,
-    "oversized_note_words": 800,
-    "multi_idea_sections": 3,
-    "multi_idea_section_words": 40,
-    "provenance_min_sources": 3,
-    "provenance_min_words": 25,
-    "verb_monoculture_ratio": 0.6,
-    "verb_monoculture_min_links": 20,
-    "inbox_stale_days": 30,
-    "log_rotation_entries": 500,
-}
 
 
 @dataclass(frozen=True, order=True)
@@ -790,63 +859,6 @@ def _as_text(value: object) -> str:
     return "" if value is None else str(value)
 
 
-def _words(text: str) -> int:
-    return len(re.findall(r"\S+", text))
-
-
-def _top_level_paragraphs(body: str) -> list[tuple[int, str]]:
-    """(line, paragraph) for prose blocks only: not headings, tables, lists or quotes."""
-    stripped = strip_code(body)
-    paragraphs: list[tuple[int, str]] = []
-    current: list[str] = []
-    start = 0
-    for lineno, line in enumerate(stripped.split("\n"), start=1):
-        text = line.strip()
-        skip = (
-            not text
-            or text.startswith(("#", ">", "|", "-", "*", "+"))
-            or text.startswith("```")
-            or ORDERED_ITEM_RE.match(text) is not None
-        )
-        if skip:
-            if current:
-                paragraphs.append((start, " ".join(current)))
-                current = []
-            continue
-        if not current:
-            start = lineno
-        current.append(text)
-    if current:
-        paragraphs.append((start, " ".join(current)))
-    return paragraphs
-
-
-def _sections(body: str) -> list[tuple[str, int]]:
-    """(heading, word count) for each '##' section."""
-    sections: list[tuple[str, int]] = []
-    heading: str | None = None
-    words = 0
-    for line in strip_code(body).split("\n"):
-        if line.startswith("## "):
-            if heading is not None:
-                sections.append((heading, words))
-            heading = line[3:].strip()
-            words = 0
-            continue
-        if heading is not None and not line.startswith("#"):
-            words += _words(line)
-    if heading is not None:
-        sections.append((heading, words))
-    return sections
-
-
-def slugify(title: str) -> str:
-    """A filename slug for a title. Used only to detect duplicate ideas."""
-    lowered = title.lower().strip()
-    lowered = re.sub(r"[^a-z0-9]+", "-", lowered)
-    return lowered.strip("-")
-
-
 def _link_entries(note: Note) -> list[tuple[str, str]]:
     """(target, verb) pairs from the frontmatter, ignoring malformed entries."""
     raw = (note.frontmatter or {}).get("links")
@@ -898,7 +910,7 @@ def _date_field(note: Note, key: str) -> dt.date | None:
 # --- individual checks -------------------------------------------------------------
 
 
-def check_vault_root(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
+def check_vault_root(vault: Vault) -> list[Finding]:
     return [
         Finding(
             code="ZK001",
@@ -912,7 +924,7 @@ def check_vault_root(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
     ]
 
 
-def check_parse(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
+def check_parse(vault: Vault) -> list[Finding]:
     findings = []
     for note in vault.notes:
         if note.parse_error:
@@ -945,57 +957,95 @@ def check_parse(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
     return findings
 
 
-def check_required_fields(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
-    findings = []
+def check_declaration(vault: Vault) -> list[Finding] | NotApplicable:
+    """ZK003. The vault is judged by the vocabulary its own SCHEMA.md declares, and by
+    nothing else.
+
+    Five dimensions, each opt-in on its own: `required_fields` (which fields a note must
+    carry), `types`, `statuses` and `confidences` (which values are legal), `verbs` (which
+    link verbs are legal), and `tags`. A vault that declares none of them is not judged at
+    all — a foreign vault's tags are not wrong for being different tags. What the linter
+    does impose is the part no note can vary: a filename that is an identity (ZK006), a
+    date that is a date (ZK005), a body, and a link that names a target and a verb.
+    """
+    declared = vault.declared_vocabulary()
+    if not declared:
+        return NotApplicable("SCHEMA.md declares no vocabulary")
+    findings: list[Finding] = []
+    required = declared.get("required_fields", [])
+    enums = (
+        ("type", declared.get("types", [])),
+        ("status", declared.get("statuses", [])),
+        ("confidence", declared.get("confidences", [])),
+    )
+    verbs = declared.get("verbs", [])
+    tags = declared.get("tags", [])
     for note in vault.notes:
         if note.frontmatter is None:
             continue
-        for name in REQUIRED_FIELDS:
+        for name in required:
             if _field(note, name) in (None, ""):
                 findings.append(
                     Finding(
                         code="ZK003",
-                        severity=ERROR,
+                        severity=WARN,
                         file=note.relpath,
                         line=1,
                         subject=name,
-                        message=f"the note has no {name!r}",
-                        action=f"add {name!r} to the frontmatter",
+                        message=f"the note has no {name!r}, which SCHEMA.md requires",
+                        action=f"add {name!r} to the frontmatter, or drop it from SCHEMA.md",
                     )
                 )
-    return findings
-
-
-def check_enums(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
-    findings = []
-    for note in vault.notes:
-        if note.frontmatter is None:
-            continue
-        for key, allowed in (
-            ("type", NOTE_TYPES),
-            ("status", NOTE_STATUSES),
-            ("confidence", CONFIDENCES),
-        ):
+        for key, allowed in enums:
             value = _field(note, key)
-            if value in (None, ""):
+            if not allowed or value in (None, ""):
                 continue
             if _as_text(value) not in allowed:
                 findings.append(
                     Finding(
-                        code="ZK004",
-                        severity=ERROR,
+                        code="ZK003",
+                        severity=WARN,
                         file=note.relpath,
                         line=1,
                         subject=key,
-                        message=f"{key} {_as_text(value)!r} is not one of {', '.join(allowed)}",
+                        message=f"{key} {_as_text(value)!r} is not one of the values "
+                        "SCHEMA.md declares",
                         evidence=f"{key}: {_as_text(value)}",
-                        action=f"use one of the documented {key} values",
+                        action=f"use one of: {', '.join(allowed)} — or declare this one too",
+                    )
+                )
+        for target, verb in _link_entries(note):
+            if not verbs or verb in verbs:
+                continue
+            findings.append(
+                Finding(
+                    code="ZK003",
+                    severity=WARN,
+                    file=note.relpath,
+                    line=None,
+                    subject=target or "link",
+                    message=f"the link verb {verb!r} is not one of the verbs SCHEMA.md declares",
+                    evidence=f"- target: {target}\n    verb: {verb}",
+                    action=f"use one of: {', '.join(verbs)} — or declare this one too",
+                )
+            )
+        for tag in _tag_list(note):
+            if tags and tag not in tags:
+                findings.append(
+                    Finding(
+                        code="ZK003",
+                        severity=WARN,
+                        file=note.relpath,
+                        line=1,
+                        subject=tag,
+                        message=f"tag {tag!r} is not among the tags SCHEMA.md declares",
+                        action="add it to SCHEMA.md, or use an existing tag",
                     )
                 )
     return findings
 
 
-def check_dates(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
+def check_dates(vault: Vault) -> list[Finding]:
     findings = []
     for note in vault.notes:
         if note.frontmatter is None:
@@ -1034,8 +1084,14 @@ def check_dates(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
     return findings
 
 
-def check_id_filename(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
-    findings = []
+def check_identity(vault: Vault) -> list[Finding]:
+    """ZK006. The filename is the note's identity, and the links resolve to it, so it is
+    the one thing about a note that cannot be edited freely.
+
+    Two ways to break one identity, and so one code: a filename that is not an identity at
+    all, and two files claiming the same one.
+    """
+    findings: list[Finding] = []
     for note in vault.notes:
         match = ID_IN_FILENAME_RE.match(note.slug)
         if not match:
@@ -1067,12 +1123,9 @@ def check_id_filename(vault: Vault, config: dict, now: dt.date) -> list[Finding]
                 )
             )
             continue
-        if note.frontmatter is None:
+        if note.frontmatter is None or note.id is None:
             continue
-        note_id = note.id
-        if note_id is None:
-            continue
-        if _as_text(note_id) != stamp:
+        if _as_text(note.id) != stamp:
             findings.append(
                 Finding(
                     code="ZK006",
@@ -1080,27 +1133,22 @@ def check_id_filename(vault: Vault, config: dict, now: dt.date) -> list[Finding]
                     file=note.relpath,
                     line=1,
                     subject="id",
-                    message=f"id {_as_text(note_id)} does not match the filename {stamp}",
-                    evidence=f"id: {_as_text(note_id)} / file: {note.slug}",
+                    message=f"id {_as_text(note.id)} does not match the filename {stamp}",
+                    evidence=f"id: {_as_text(note.id)} / file: {note.slug}",
                     action="make them agree; the filename is what the links resolve to",
                 )
             )
-    return findings
-
-
-def check_duplicate_id(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
     seen: dict[str, list[Note]] = {}
     for note in vault.notes:
         if note.id:
             seen.setdefault(note.id, []).append(note)
-    findings = []
     for note_id, notes in sorted(seen.items()):
         if len(notes) < 2:
             continue
         for note in sorted(notes, key=lambda item: item.relpath)[1:]:
             findings.append(
                 Finding(
-                    code="ZK007",
+                    code="ZK006",
                     severity=ERROR,
                     file=note.relpath,
                     line=1,
@@ -1113,37 +1161,36 @@ def check_duplicate_id(vault: Vault, config: dict, now: dt.date) -> list[Finding
     return findings
 
 
-def _resolve(vault: Vault, target: str) -> bool:
-    return vault.resolve(target) is not None
+def check_references(vault: Vault) -> list[Finding]:
+    """ZK008. Every reference a note carries points at something, wherever it is written:
+    a frontmatter link, a `[[wikilink]]`, a `sources:` entry, a `^[raw/...]` marker.
 
-
-def check_broken_links(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
-    """One finding per (note, target), not one per surface.
-
-    The body's Links section restates the frontmatter by design (ZK028 enforces it), so a
-    broken target appears twice in every well-formed-but-wrong note. Reporting both would
-    double the count for the single defect and make the total meaningless.
+    One finding per (note, target), not one per surface. The body's Links section restates
+    the frontmatter by design (ZK028 enforces it), so a broken target would otherwise be
+    counted twice for the single defect and the total would mean nothing. All four surfaces
+    go through one resolver, so they cannot disagree about what exists.
     """
     findings = []
     for note in vault.notes:
         reported: set[str] = set()
         for target, verb in _link_entries(note):
-            if target and not _resolve(vault, target):
-                reported.add(target)
-                findings.append(
-                    Finding(
-                        code="ZK008",
-                        severity=ERROR,
-                        file=note.relpath,
-                        line=None,
-                        subject=target,
-                        message=f"the link target {target!r} does not exist",
-                        evidence=f"- target: {target}\n    verb: {verb}",
-                        action="create the note, or point the link at the note that exists",
-                    )
+            if not target or reference_target(vault, target) is not None:
+                continue
+            reported.add(target)
+            findings.append(
+                Finding(
+                    code="ZK008",
+                    severity=ERROR,
+                    file=note.relpath,
+                    line=None,
+                    subject=target,
+                    message=f"the link target {target!r} does not exist",
+                    evidence=f"- target: {target}\n    verb: {verb}",
+                    action="create the note, or point the link at the note that exists",
                 )
+            )
         for target, line in note.links:
-            if target in reported or _resolve(vault, target):
+            if target in reported or reference_target(vault, target) is not None:
                 continue
             reported.add(target)
             findings.append(
@@ -1158,46 +1205,35 @@ def check_broken_links(vault: Vault, config: dict, now: dt.date) -> list[Finding
                     action="create the note, or correct the link",
                 )
             )
-    return findings
-
-
-def check_verbs(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
-    findings = []
-    for note in vault.notes:
-        for target, verb in _link_entries(note):
-            if verb in LINK_VERBS:
+        for source in _source_list(note):
+            if source in reported or reference_target(vault, source) is not None:
                 continue
+            reported.add(source)
             findings.append(
                 Finding(
-                    code="ZK009",
+                    code="ZK008",
                     severity=ERROR,
                     file=note.relpath,
-                    line=None,
-                    subject=target or "link",
-                    message=f"link verb {verb!r} is not one of the six",
-                    evidence=f"- target: {target}\n    verb: {verb}",
-                    action=f"use one of: {', '.join(LINK_VERBS)}",
+                    line=1,
+                    subject=source,
+                    message=f"the cited source {source!r} is not in the vault",
+                    action="capture the source under raw/, or correct the path",
                 )
             )
-    return findings
-
-
-def check_outbound_links(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
-    findings = []
-    for note in vault.notes:
-        if note.frontmatter is None:
-            continue
-        count = len([entry for entry in _link_entries(note) if entry[0]])
-        if count < 2:
+        for target, line in note.markers:
+            if target in reported or reference_target(vault, target) is not None:
+                continue
+            reported.add(target)
             findings.append(
                 Finding(
-                    code="ZK010",
+                    code="ZK008",
                     severity=ERROR,
                     file=note.relpath,
-                    line=None,
-                    subject=note.slug,
-                    message=f"the note has {count} outbound link(s); the minimum is 2",
-                    action="link it to the ideas it extends, supports or contradicts",
+                    line=line,
+                    subject=target,
+                    message=f"the provenance marker points at {target!r}, which is not in the vault",
+                    evidence=f"^[{target}]",
+                    action="capture the source under raw/, or remove the marker",
                 )
             )
     return findings
@@ -1206,10 +1242,10 @@ def check_outbound_links(vault: Vault, config: dict, now: dt.date) -> list[Findi
 def inbound_counts(vault: Vault) -> dict[str, int]:
     """Inbound links per note, keyed by relpath.
 
-    Links from `structure/` are excluded, or `index.md` would cure every orphan and ZK011
+    Links from `structure/` are excluded, or `index.md` would cure every orphan and ZK010
     would be provably vacuous. The count keys on the note a link *resolves to* rather than
     on the string that was written, so the four spellings of one target are one link. Both
-    ZK011 and the metrics use this, so the finding and the number cannot disagree.
+    ZK010 and the metrics use this, so the finding and the number cannot disagree.
     """
     counts: dict[str, int] = {}
     for note in vault.notes:
@@ -1223,29 +1259,45 @@ def inbound_counts(vault: Vault) -> dict[str, int]:
     return counts
 
 
-def check_orphans(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
-    """ZK011. A note nothing links to is invisible, however good it is."""
+def check_isolation(vault: Vault) -> list[Finding]:
+    """ZK010. A note that neither links nor is linked is not in the vault, whatever it says.
+
+    Both directions are one subject: a note nothing can reach and a note that reaches
+    nothing are the same defect seen from either end. The floor is zero rather than "two
+    outbound links" — how many links a note *should* carry is a writer's judgement, and a
+    check may only assert what it can see in the file.
+    """
     inbound = inbound_counts(vault)
     findings = []
     for note in vault.notes:
         if note.frontmatter is None:
             continue
-        if inbound.get(note.relpath, 0) == 0:
-            findings.append(
-                Finding(
-                    code="ZK011",
-                    severity=WARN,
-                    file=note.relpath,
-                    line=None,
-                    subject=note.slug,
-                    message="the note has no inbound links",
-                    action="link it from a note that depends on it — an orphan is invisible",
-                )
+        outbound = len([entry for entry in _link_entries(note) if entry[0]])
+        inbound_here = inbound.get(note.relpath, 0)
+        if outbound and inbound_here:
+            continue
+        if not outbound and not inbound_here:
+            message = "the note links to nothing, and nothing links to it"
+        elif not outbound:
+            message = "the note links out to nothing"
+        else:
+            message = "no note links to this one"
+        findings.append(
+            Finding(
+                code="ZK010",
+                severity=WARN,
+                file=note.relpath,
+                line=None,
+                subject=note.slug,
+                message=message,
+                action="link it to the ideas it extends, supports or contradicts — or link "
+                "it from a note that depends on it",
             )
+        )
     return findings
 
 
-def check_index(vault: Vault, config: dict, now: dt.date):
+def check_index(vault: Vault):
     index = vault.structure.get("index.md")
     if index is None:
         return NotApplicable("there is no structure/index.md")
@@ -1266,7 +1318,7 @@ def check_index(vault: Vault, config: dict, now: dt.date):
                 )
             )
     for target, line in find_wikilinks(index):
-        if not _resolve(vault, target):
+        if reference_target(vault, target) is None:
             findings.append(
                 Finding(
                     code="ZK012",
@@ -1282,30 +1334,7 @@ def check_index(vault: Vault, config: dict, now: dt.date):
     return findings
 
 
-def check_sources(vault: Vault, config: dict, now: dt.date):
-    if not any(_source_list(note) for note in vault.notes):
-        return NotApplicable("no note cites a source")
-    findings = []
-    for note in vault.notes:
-        if note.frontmatter is None:
-            continue
-        for source in _source_list(note):
-            if not (vault.root / source).is_file():
-                findings.append(
-                    Finding(
-                        code="ZK013",
-                        severity=ERROR,
-                        file=note.relpath,
-                        line=1,
-                        subject=source,
-                        message=f"the cited source {source!r} is not in the vault",
-                        action="capture the source under raw/, or correct the path",
-                    )
-                )
-    return findings
-
-
-def check_raw_hashes(vault: Vault, config: dict, now: dt.date):
+def check_raw_hashes(vault: Vault):
     if not vault.raw:
         return NotApplicable("the vault has no raw sources")
     findings = []
@@ -1328,7 +1357,7 @@ def check_raw_hashes(vault: Vault, config: dict, now: dt.date):
     return findings
 
 
-def check_empty_body(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
+def check_empty_body(vault: Vault) -> list[Finding]:
     findings = []
     for note in vault.notes:
         if note.frontmatter is None:
@@ -1348,86 +1377,7 @@ def check_empty_body(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
     return findings
 
 
-def check_tags(vault: Vault, config: dict, now: dt.date):
-    schema = vault.structure.get("SCHEMA.md", "")
-    schema_path = vault.root / "SCHEMA.md"
-    if schema_path.is_file():
-        schema = schema_path.read_text(encoding="utf-8", errors="replace")
-    declared: list[str] = []
-    frontmatter, _, _, _ = split_with_lines(schema.encode("utf-8"))
-    parsed, _, _ = parse_yaml_subset(frontmatter.decode("utf-8", "replace"))
-    if isinstance(parsed, dict) and isinstance(parsed.get("tags"), list):
-        declared = [_as_text(tag) for tag in parsed["tags"]]
-    if not declared:
-        return NotApplicable("SCHEMA.md declares no tag taxonomy")
-    findings = []
-    for note in vault.notes:
-        for tag in _tag_list(note):
-            if tag not in declared:
-                findings.append(
-                    Finding(
-                        code="ZK016",
-                        severity=WARN,
-                        file=note.relpath,
-                        line=1,
-                        subject=tag,
-                        message=f"tag {tag!r} is not in the taxonomy",
-                        action="add it to SCHEMA.md, or use an existing tag",
-                    )
-                )
-    return findings
-
-
-def check_stale_drafts(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
-    limit = int(config["stale_draft_days"])
-    findings = []
-    for note in vault.notes:
-        if _as_text(_field(note, "status")) not in ("draft", "seed"):
-            continue
-        stamp = _date_field(note, "updated") or _date_field(note, "created")
-        if stamp is None:
-            continue
-        age = (now - stamp).days
-        if age > limit:
-            findings.append(
-                Finding(
-                    code="ZK017",
-                    severity=WARN,
-                    file=note.relpath,
-                    line=1,
-                    subject=note.slug,
-                    message=f"still {_as_text(_field(note, 'status'))} after {age} days",
-                    evidence=f"updated {stamp}",
-                    action="promote it, split it, or archive it",
-                )
-            )
-    return findings
-
-
-def check_provenance_targets(vault: Vault, config: dict, now: dt.date):
-    """ZK018. The deterministic half of provenance: do the cited files exist."""
-    if not any(note.markers for note in vault.notes):
-        return NotApplicable("no note carries a provenance marker")
-    findings = []
-    for note in vault.notes:
-        for target, line in note.markers:
-            if not (vault.root / target).is_file():
-                findings.append(
-                    Finding(
-                        code="ZK018",
-                        severity=ERROR,
-                        file=note.relpath,
-                        line=line,
-                        subject=target,
-                        message=f"the provenance marker points at {target!r}, which is not in the vault",
-                        evidence=f"^[{target}]",
-                        action="capture the source under raw/, or remove the marker",
-                    )
-                )
-    return findings
-
-
-def check_hash_drift(vault: Vault, config: dict, now: dt.date):
+def check_hash_drift(vault: Vault):
     if not vault.raw:
         return NotApplicable("the vault has no raw sources")
     findings = []
@@ -1455,78 +1405,10 @@ def check_hash_drift(vault: Vault, config: dict, now: dt.date):
     return findings
 
 
-def check_duplicate_links(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
-    findings = []
-    for note in vault.notes:
-        seen: set[str] = set()
-        for target, verb in _link_entries(note):
-            if not target:
-                continue
-            other = vault.resolve(target)
-            if other is note:
-                findings.append(
-                    Finding(
-                        code="ZK020",
-                        severity=WARN,
-                        file=note.relpath,
-                        line=None,
-                        subject=target,
-                        message="the note links to itself",
-                        action="remove the self-link",
-                    )
-                )
-                continue
-            # Keyed on the note, not the string: one note linked as both `202609251200-x`
-            # and `memory/202609251200-x` is still the same target named twice.
-            key = other.relpath if other is not None else target
-            if key in seen:
-                findings.append(
-                    Finding(
-                        code="ZK020",
-                        severity=WARN,
-                        file=note.relpath,
-                        line=None,
-                        subject=target,
-                        message=f"the target {target!r} is linked more than once",
-                        action="keep one link, with the verb that fits best",
-                    )
-                )
-            seen.add(key)
-    return findings
-
-
-def check_duplicate_slugs(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
-    """The deterministic proxy for semantic duplication: two titles, one slug."""
-    by_slug: dict[str, list[Note]] = {}
-    for note in vault.notes:
-        title = _as_text(_field(note, "title"))
-        if not title:
-            continue
-        by_slug.setdefault(slugify(title), []).append(note)
-    findings = []
-    for slug, notes in sorted(by_slug.items()):
-        if len(notes) < 2 or not slug:
-            continue
-        for note in sorted(notes, key=lambda item: item.relpath)[1:]:
-            findings.append(
-                Finding(
-                    code="ZK021",
-                    severity=WARN,
-                    file=note.relpath,
-                    line=1,
-                    subject=slug,
-                    message=f"two notes share the title slug {slug!r}",
-                    evidence=", ".join(sorted(item.relpath for item in notes)),
-                    action="these are probably one idea; merge them, or retitle one",
-                )
-            )
-    return findings
-
-
 LOG_ENTRY_RE = re.compile(r"^\s*[-*]\s")
 
 
-def check_log(vault: Vault, config: dict, now: dt.date):
+def check_log(vault: Vault):
     log_path = vault.root / "log.md"
     if not log_path.is_file():
         return NotApplicable("the vault has no log.md")
@@ -1552,99 +1434,28 @@ def check_log(vault: Vault, config: dict, now: dt.date):
     return findings
 
 
-def check_oversized(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
-    limit = int(config["oversized_note_words"])
-    findings = []
-    for note in vault.notes:
-        if note.frontmatter is None:
-            continue
-        count = _words(strip_code(note.body))
-        if count > limit:
-            findings.append(
-                Finding(
-                    code="ZK023",
-                    severity=INFO,
-                    file=note.relpath,
-                    line=None,
-                    subject=note.slug,
-                    message=f"the note is {count} words (soft limit {limit})",
-                    action="length alone is not a defect; check whether it holds one idea",
-                )
-            )
-    return findings
+def _cited_files(vault: Vault) -> set[str]:
+    """Every file the notes cite, keyed by vault-relative path.
 
-
-def check_provenance_gaps(vault: Vault, config: dict, now: dt.date):
-    """ZK024. Advisory, aggregated to one finding per note, with an explicit opt-out."""
-    min_sources = int(config["provenance_min_sources"])
-    min_words = int(config["provenance_min_words"])
-    eligible = [
-        note
-        for note in vault.notes
-        if note.frontmatter is not None
-        and _as_text(_field(note, "provenance")) != "note"
-        and len(_source_list(note)) >= min_sources
-    ]
-    if not eligible:
-        return NotApplicable(f"no note cites {min_sources} or more sources")
-    findings = []
-    for note in vault.notes:
-        if note.frontmatter is None:
-            continue
-        if _as_text(_field(note, "provenance")) == "note":
-            continue
-        if len(_source_list(note)) < min_sources:
-            continue
-        gaps = [
-            (line, text)
-            for line, text in _top_level_paragraphs(note.body)
-            if _words(text) >= min_words and not PROVENANCE_RE.search(text)
-        ]
-        if not gaps:
-            continue
-        lines = ", ".join(str(line) for line, _ in gaps[:5])
-        findings.append(
-            Finding(
-                code="ZK024",
-                severity=INFO,
-                file=note.relpath,
-                line=gaps[0][0],
-                subject=note.slug,
-                message=f"{len(gaps)} paragraph(s) carry no provenance marker",
-                evidence=f"lines {lines}{' …' if len(gaps) > 5 else ''}",
-                action="cite the source inline with ^[raw/...]; if the paragraph is your "
-                "own synthesis, add 'provenance: note' to the frontmatter",
-            )
-        )
-    return findings
-
-
-def check_and_in_title(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
-    findings = []
-    for note in vault.notes:
-        title = _as_text(_field(note, "title"))
-        if re.search(r"\band\b", title, flags=re.IGNORECASE):
-            findings.append(
-                Finding(
-                    code="ZK025",
-                    severity=INFO,
-                    file=note.relpath,
-                    line=1,
-                    subject=note.slug,
-                    message=f"the title contains 'and': {title!r}",
-                    action='a title that needs "and" names two ideas; consider splitting',
-                )
-            )
-    return findings
-
-
-def check_unreferenced_raw(vault: Vault, config: dict, now: dt.date):
-    if not vault.raw:
-        return NotApplicable("the vault has no raw sources")
+    A source cited as `raw/x` and one cited as `raw/x.md` are one file, because they go
+    through the same resolver that decides whether a reference resolves at all.
+    """
     cited: set[str] = set()
     for note in vault.notes:
-        cited.update(_source_list(note))
-        cited.update(target for target, _ in note.markers)
+        targets = list(_source_list(note)) + [target for target, _ in note.markers]
+        for target in targets:
+            resolved = reference_target(vault, target)
+            if isinstance(resolved, Path):
+                cited.add(str(resolved.relative_to(vault.root)))
+            elif target:
+                cited.add(target)
+    return cited
+
+
+def check_unreferenced_raw(vault: Vault):
+    if not vault.raw:
+        return NotApplicable("the vault has no raw sources")
+    cited = _cited_files(vault)
     findings = []
     for raw in vault.raw:
         if raw.relpath in cited:
@@ -1663,40 +1474,42 @@ def check_unreferenced_raw(vault: Vault, config: dict, now: dt.date):
     return findings
 
 
-def check_unreciprocated_contradictions(vault: Vault, config: dict, now: dt.date):
-    by_id = vault.notes_by_id
-    if not any(
-        verb == "contradicts" for note in vault.notes for _, verb in _link_entries(note)
-    ):
+def check_unreciprocated_contradictions(vault: Vault):
+    """ZK027. A contradiction is a relationship; one recorded on a single side is half-written."""
+    if not any(verb == "contradicts" for note in vault.notes for _, verb in _link_entries(note)):
         return NotApplicable("no note uses the 'contradicts' verb")
     findings = []
     for note in vault.notes:
         for target, verb in _link_entries(note):
             if verb != "contradicts" or not target:
                 continue
-            other = by_id.get(target) or next(
-                (item for item in vault.notes if item.slug == target), None
-            )
-            if other is None:
+            other = reference_target(vault, target)
+            if not isinstance(other, Note):
                 continue
-            back = {entry for entry, _ in _link_entries(other)}
-            back.update(targets for targets, _ in other.links)
-            if note.slug not in back and (note.id or "\0") not in back:
-                findings.append(
-                    Finding(
-                        code="ZK027",
-                        severity=INFO,
-                        file=other.relpath,
-                        line=None,
-                        subject=note.slug,
-                        message=f"{note.relpath} contradicts this note, and it does not link back",
-                        action="a contradiction is a relationship: record it on both sides",
-                    )
+            back = {reference_key(vault, entry) for entry, _ in _link_entries(other) if entry}
+            back |= {reference_key(vault, entry) for entry, _ in other.links if entry}
+            if note.relpath in back:
+                continue
+            findings.append(
+                Finding(
+                    code="ZK027",
+                    severity=INFO,
+                    file=other.relpath,
+                    line=None,
+                    subject=note.slug,
+                    message=f"{note.relpath} contradicts this note, and it does not link back",
+                    action="a contradiction is a relationship: record it on both sides",
                 )
+            )
     return findings
 
 
-def check_links_section_drift(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
+def check_links_section_drift(vault: Vault) -> list[Finding]:
+    """ZK028. The body's Links section restates the frontmatter; the two must agree.
+
+    Compared by what each target *resolves to*, so a body that writes the long form of a
+    link the frontmatter wrote short is not drift.
+    """
     findings = []
     for note in vault.notes:
         if note.frontmatter is None:
@@ -1705,8 +1518,10 @@ def check_links_section_drift(vault: Vault, config: dict, now: dt.date) -> list[
             # A note with no body is ZK015's report. Two findings for one empty file would
             # make the reader fix the same thing twice.
             continue
-        frontmatter_targets = {target for target, _ in _link_entries(note) if target}
-        body_targets = {target for target, _ in note.links if target}
+        frontmatter_targets = {
+            reference_key(vault, target) for target, _ in _link_entries(note) if target
+        }
+        body_targets = {reference_key(vault, target) for target, _ in note.links if target}
         if not frontmatter_targets and not body_targets:
             continue
         if frontmatter_targets != body_targets:
@@ -1727,190 +1542,47 @@ def check_links_section_drift(vault: Vault, config: dict, now: dt.date) -> list[
     return findings
 
 
-def check_verb_monoculture(vault: Vault, config: dict, now: dt.date):
-    """ZK029. The detector for 'the taxonomy collapsed to supports'."""
-    verbs: dict[str, int] = {}
-    total = 0
-    for note in vault.notes:
-        for _, verb in _link_entries(note):
-            if verb:
-                verbs[verb] = verbs.get(verb, 0) + 1
-                total += 1
-    minimum = int(config["verb_monoculture_min_links"])
-    if total < minimum:
-        return NotApplicable(f"only {total} links; the check needs {minimum}")
-    verb, count = max(sorted(verbs.items()), key=lambda item: item[1])
-    ratio = count / total
-    if ratio <= float(config["verb_monoculture_ratio"]):
-        return []
-    return [
-        Finding(
-            code="ZK029",
-            severity=INFO,
-            file="",
-            subject=verb,
-            line=None,
-            message=f"{count} of {total} links use the verb {verb!r} ({ratio:.0%})",
-            evidence=", ".join(f"{name}: {number}" for name, number in sorted(verbs.items())),
-            action="either the vault really is monotone, or the verb taxonomy needs fewer verbs",
-        )
-    ]
-
-
-def check_stale_inbox(vault: Vault, config: dict, now: dt.date):
-    inbox = vault.root / "inbox"
-    if not inbox.is_dir():
-        return NotApplicable("the vault has no inbox/")
-    if not any(inbox.rglob("*.md")):
-        return NotApplicable("the inbox is empty")
-    limit = int(config["inbox_stale_days"])
-    findings = []
-    for path in sorted(inbox.rglob("*.md")):
-        data = path.read_bytes()
-        frontmatter, _, _, _ = split_with_lines(data)
-        parsed, _, _ = parse_yaml_subset(frontmatter.decode("utf-8", "replace"))
-        stamp = None
-        if isinstance(parsed, dict):
-            for key in ("created", "captured", "ingested"):
-                value = parsed.get(key)
-                if isinstance(value, dt.datetime):
-                    stamp = value.date()
-                elif isinstance(value, dt.date):
-                    stamp = value
-                elif isinstance(value, str) and ISO_DATE_RE.match(value):
-                    stamp = dt.date.fromisoformat(value)
-                if stamp:
-                    break
-        if stamp is None:
-            continue
-        age = (now - stamp).days
-        if age > limit:
-            findings.append(
-                Finding(
-                    code="ZK031",
-                    severity=INFO,
-                    file=str(path.relative_to(vault.root)),
-                    line=1,
-                    subject=str(path.relative_to(vault.root)),
-                    message=f"unfiled for {age} days",
-                    evidence=f"captured {stamp}",
-                    action="ingest it, or delete it and say why",
-                )
-            )
-    return findings
-
-
-def check_multi_idea(vault: Vault, config: dict, now: dt.date) -> list[Finding]:
-    needed = int(config["multi_idea_sections"])
-    min_words = int(config["multi_idea_section_words"])
-    findings = []
-    for note in vault.notes:
-        if note.frontmatter is None:
-            continue
-        substantial = [
-            (heading, words) for heading, words in _sections(note.body) if words >= min_words
-        ]
-        if len(substantial) >= needed:
-            findings.append(
-                Finding(
-                    code="ZK030",
-                    severity=INFO,
-                    file=note.relpath,
-                    line=None,
-                    subject=note.slug,
-                    message=f"the note has {len(substantial)} substantial sections",
-                    evidence=", ".join(f"{heading!r} ({words}w)" for heading, words in substantial[:6]),
-                    action="a split candidate: each section may be its own idea",
-                )
-            )
-    return findings
-
-
-def check_log_rotation(vault: Vault, config: dict, now: dt.date):
-    log_path = vault.root / "log.md"
-    if not log_path.is_file():
-        return NotApplicable("the vault has no log.md")
-    limit = int(config["log_rotation_entries"])
-    entries = [
-        line
-        for line in log_path.read_text(encoding="utf-8", errors="replace").split("\n")
-        if LOG_ENTRY_RE.match(line)
-    ]
-    if len(entries) <= limit:
-        return []
-    return [
-        Finding(
-            code="ZK032",
-            severity=INFO,
-            file="log.md",
-            line=None,
-            subject="log.md",
-            message=f"the log has {len(entries)} entries (soft limit {limit})",
-            action="rotate the older entries into log-archive.md",
-        )
-    ]
-
-
 #: The registry. `references/lint-checks.md` documents every code here, 1:1, and a test
-#: fails if the two ever drift apart.
+#: fails if the two ever drift apart. The numbers are not contiguous, and that is the
+#: point: a retired code keeps its number retired, so `ZK019` means one thing in every
+#: version that reports it. `references/lint-checks.md` carries the v1 → v2 mapping.
 CHECKS: tuple[tuple[str, object], ...] = (
     ("ZK001", check_vault_root),
     ("ZK002", check_parse),
-    ("ZK003", check_required_fields),
-    ("ZK004", check_enums),
+    ("ZK003", check_declaration),
     ("ZK005", check_dates),
-    ("ZK006", check_id_filename),
-    ("ZK007", check_duplicate_id),
-    ("ZK008", check_broken_links),
-    ("ZK009", check_verbs),
-    ("ZK010", check_outbound_links),
-    ("ZK011", check_orphans),
+    ("ZK006", check_identity),
+    ("ZK008", check_references),
+    ("ZK010", check_isolation),
     ("ZK012", check_index),
-    ("ZK013", check_sources),
     ("ZK014", check_raw_hashes),
     ("ZK015", check_empty_body),
-    ("ZK016", check_tags),
-    ("ZK017", check_stale_drafts),
-    ("ZK018", check_provenance_targets),
     ("ZK019", check_hash_drift),
-    ("ZK020", check_duplicate_links),
-    ("ZK021", check_duplicate_slugs),
     ("ZK022", check_log),
-    ("ZK023", check_oversized),
-    ("ZK024", check_provenance_gaps),
-    ("ZK025", check_and_in_title),
     ("ZK026", check_unreferenced_raw),
     ("ZK027", check_unreciprocated_contradictions),
     ("ZK028", check_links_section_drift),
-    ("ZK029", check_verb_monoculture),
-    ("ZK030", check_multi_idea),
-    ("ZK031", check_stale_inbox),
-    ("ZK032", check_log_rotation),
 )
 
 #: Checks whose subject is the notes themselves. With no notes they have nothing to
 #: examine, and saying so is the difference between "clean" and "not looked at".
 NOTE_SCOPED = frozenset(
-    {
-        "ZK003", "ZK004", "ZK005", "ZK006", "ZK007", "ZK008", "ZK009", "ZK010",
-        "ZK011", "ZK013", "ZK015", "ZK016", "ZK017", "ZK018", "ZK020", "ZK021",
-        "ZK023", "ZK024", "ZK025", "ZK027", "ZK028", "ZK030",
-    }
+    {"ZK003", "ZK005", "ZK006", "ZK008", "ZK010", "ZK015", "ZK027", "ZK028"}
 )
-RAW_SCOPED = frozenset({"ZK014", "ZK019"})
+#: Checks whose subject is `raw/`. ZK026 belongs here as much as the two digest checks: a
+#: vault with no captures has nothing to hash and nothing to be left uncited, and leaving it
+#: out had the same sentence written twice — once in this table, once in the check's body.
+RAW_SCOPED = frozenset({"ZK014", "ZK019", "ZK026"})
 
 SEVERITIES = {
-    "ZK001": ERROR, "ZK002": ERROR, "ZK003": ERROR, "ZK004": ERROR, "ZK005": ERROR,
-    "ZK006": ERROR, "ZK007": ERROR, "ZK008": ERROR, "ZK009": ERROR, "ZK010": ERROR,
-    "ZK012": ERROR, "ZK013": ERROR, "ZK014": ERROR, "ZK015": ERROR, "ZK018": ERROR,
-    "ZK011": WARN, "ZK016": WARN, "ZK017": WARN, "ZK019": WARN, "ZK020": WARN,
-    "ZK021": WARN, "ZK022": WARN,
-    "ZK023": INFO, "ZK024": INFO, "ZK025": INFO, "ZK026": INFO, "ZK027": INFO,
-    "ZK028": INFO, "ZK029": INFO, "ZK030": INFO, "ZK031": INFO, "ZK032": INFO,
+    "ZK001": ERROR, "ZK002": ERROR, "ZK005": ERROR, "ZK006": ERROR, "ZK008": ERROR,
+    "ZK012": ERROR, "ZK014": ERROR, "ZK015": ERROR,
+    "ZK003": WARN, "ZK010": WARN, "ZK019": WARN, "ZK022": WARN,
+    "ZK026": INFO, "ZK027": INFO, "ZK028": INFO,
 }
 
 
-def run_checks(vault: Vault, config: dict, now: dt.date) -> Report:
+def run_checks(vault: Vault) -> Report:
     report = Report()
     for code, function in CHECKS:
         if not vault.notes and code in NOTE_SCOPED:
@@ -1924,7 +1596,7 @@ def run_checks(vault: Vault, config: dict, now: dt.date) -> Report:
             )
             continue
         try:
-            produced = function(vault, config, now)
+            produced = function(vault)
         except Exception as exc:  # noqa: BLE001 - a check that cannot run must say so
             report.skipped_checks.append(
                 {"code": code, "reason": f"{type(exc).__name__}: {exc}"}
@@ -1974,57 +1646,29 @@ def collect_metrics(vault: Vault) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def resolve_config(vault: Vault, overrides: dict[str, object]) -> tuple[dict, dict]:
-    """defaults < SCHEMA.md < the command line, with the provenance of each value kept."""
-    config = dict(DEFAULT_CONFIG)
-    sources = {key: "default" for key in config}
+def build_document(vault: Vault, report: Report, now: dt.date) -> dict:
+    """The JSON contract.
 
-    schema_path = vault.root / "SCHEMA.md"
-    if schema_path.is_file():
-        frontmatter, _, _, _ = split_with_lines(schema_path.read_bytes())
-        parsed, _, _ = parse_yaml_subset(frontmatter.decode("utf-8", "replace"))
-        if isinstance(parsed, dict):
-            for key in config:
-                override = parsed.get(f"lint_{key}")
-                if override is not None:
-                    config[key] = override
-                    sources[key] = "SCHEMA.md"
-
-    for key, value in overrides.items():
-        if key not in config:
-            continue
-        config[key] = value
-        sources[key] = "command line"
-    return config, sources
-
-
-def _parse_overrides(pairs: list[str]) -> dict[str, object]:
-    overrides: dict[str, object] = {}
-    for pair in pairs:
-        key, _, value = pair.partition("=")
-        key = key.strip()
-        if key not in DEFAULT_CONFIG:
-            raise SystemExit(f"unknown setting {key!r}; known: {', '.join(sorted(DEFAULT_CONFIG))}")
-        default = DEFAULT_CONFIG[key]
-        try:
-            overrides[key] = type(default)(value) if not isinstance(default, bool) else value.lower() == "true"
-        except ValueError as exc:
-            raise SystemExit(f"{key}={value!r} is not a valid {type(default).__name__}") from exc
-    return overrides
-
-
-def build_document(vault: Vault, report: Report, config: dict, sources: dict, now: dt.date) -> dict:
+    `declared` is the vocabulary the vault has put in force, and `declared_sources` names
+    where each dimension came from: `SCHEMA.md` for one it declares, `not declared` for one
+    it does not. That is how a reader tells a vault which opted out of a dimension from one
+    this linter never read — the two look identical in the findings.
+    """
     by_severity: dict[str, int] = {}
     by_code: dict[str, int] = {}
     for finding in report.findings:
         by_severity[finding.severity] = by_severity.get(finding.severity, 0) + 1
         by_code[finding.code] = by_code.get(finding.code, 0) + 1
+    declared = vault.declared_vocabulary()
     return {
         "schema_version": SCHEMA_VERSION,
         "vault": str(vault.root),
         "now": now.isoformat(),
-        "config": dict(sorted(config.items())),
-        "config_sources": dict(sorted(sources.items())),
+        "declared": dict(sorted(declared.items())),
+        "declared_sources": {
+            key: ("SCHEMA.md" if key in declared else "not declared")
+            for key in VOCABULARY_DIMENSIONS
+        },
         "summary": {
             "counts_by_severity": dict(sorted(by_severity.items())),
             "counts_by_code": dict(sorted(by_code.items())),
@@ -2040,10 +1684,16 @@ def build_document(vault: Vault, report: Report, config: dict, sources: dict, no
 def group_skipped(skipped: list[dict]) -> list[tuple[list[str], str]]:
     """Not-run checks grouped by reason, in the order the reasons first appear.
 
-    The JSON keeps one entry per check — a machine asking "did ZK011 run?" deserves a
-    direct answer. The human output would otherwise print the same sentence twenty-two
-    times for a directory that is not a vault, which is how a report teaches its reader to
-    stop reading it. Every code is still named; only the repetition is removed.
+    The JSON keeps one entry per check — a machine asking "did ZK010 run?" deserves a
+    direct answer. The human output would otherwise print the same sentence once per check,
+    which is how a report teaches its reader to stop reading it. Every code is still named;
+    only the repetition is removed.
+
+    There is deliberately no `ZK003..ZK008 (8 checks)` collapse. The skipped codes are not a
+    contiguous run of `CHECKS` — the note-scoped eight are interleaved with the index, raw
+    and log checks — so a range would name two codes and hide the rest behind a span no
+    reader can expand. At fifteen codes the longest line carries eight names, which is
+    legible; the width a collapse saves is not worth a line that cannot be read back.
     """
     groups: dict[str, list[str]] = {}
     for entry in skipped:
@@ -2078,12 +1728,7 @@ def render_text(document: dict) -> str:
     if summary["baselined"]:
         lines.append(f"{summary['baselined']} finding(s) suppressed by the baseline")
     for reason, codes in group_skipped(document["skipped_checks"]):
-        if len(codes) == 1:
-            lines.append(f"NOT RUN: {codes[0]} ({reason})")
-        elif len(codes) <= 4:
-            lines.append(f"NOT RUN: {', '.join(codes)} ({reason})")
-        else:
-            lines.append(f"NOT RUN: {codes[0]}..{codes[-1]} ({len(codes)} checks; {reason})")
+        lines.append(f"NOT RUN: {', '.join(codes)} ({reason})")
     for failure in document["parse_failures"]:
         lines.append(f"PARSE FAILURE: {failure['file']}:{failure['line']} {failure['message']}")
     if not findings:
@@ -2093,14 +1738,14 @@ def render_text(document: dict) -> str:
 
 def lint_vault(
     root: Path,
-    config_overrides: dict,
     now: dt.date,
     baseline: set[str],
     fail_on: str = ERROR,
 ) -> tuple[dict, int]:
+    """`now` is what the report says it was taken; no check reads it, which is what makes
+    two runs over the same bytes report the same findings whenever they are run."""
     vault = load_vault(root)
-    config, sources = resolve_config(vault, config_overrides)
-    report = run_checks(vault, config, now)
+    report = run_checks(vault)
 
     report.parse_failures = [
         {"file": finding.file, "line": finding.line, "message": finding.message}
@@ -2113,7 +1758,7 @@ def lint_vault(
         report.metrics["baselined"] = len(report.findings) - len(kept)
         report.findings = kept
 
-    document = build_document(vault, report, config, sources, now)
+    document = build_document(vault, report, now)
     return document, exit_code(document, vault, fail_on)
 
 
@@ -2175,13 +1820,12 @@ def _cmd_lint(args: argparse.Namespace) -> int:
         return 2
 
     now = dt.date.fromisoformat(args.now) if args.now else dt.date.today()
-    overrides = _parse_overrides(args.set)
     baseline = _load_baseline(args.baseline)
 
-    document, code = lint_vault(root, overrides, now, baseline, args.fail_on)
+    document, code = lint_vault(root, now, baseline, args.fail_on)
 
     if args.baseline_keys:
-        keys = sorted({finding["key"] for finding in _all_findings(root, overrides, now)})
+        keys = sorted({finding["key"] for finding in _all_findings(root)})
         print(json.dumps(keys, indent=2))
         return 0
 
@@ -2199,10 +1843,8 @@ def _cmd_lint(args: argparse.Namespace) -> int:
     return code
 
 
-def _all_findings(root: Path, overrides: dict, now: dt.date) -> list[dict]:
-    vault = load_vault(root)
-    config, _ = resolve_config(vault, overrides)
-    report = run_checks(vault, config, now)
+def _all_findings(root: Path) -> list[dict]:
+    report = run_checks(load_vault(root))
     return [
         {"key": finding.key(), "code": finding.code, "file": finding.file, "subject": finding.subject}
         for finding in report.findings
@@ -2236,16 +1878,17 @@ def main(argv: list[str] | None = None) -> int:
         help="print the current findings as baseline keys and exit (redirect it yourself: "
         "this script never writes a file)",
     )
-    parser.add_argument("--now", help="reference date for decay checks (YYYY-MM-DD)")
     parser.add_argument(
-        "--set", action="append", default=[], metavar="KEY=VALUE", help="override a threshold"
+        "--now",
+        help="the date the report says it was taken (YYYY-MM-DD). No check decides by it, "
+        "so two runs over the same bytes report the same findings whenever they run",
     )
     parser.add_argument("--quiet", action="store_true", help="no output; the exit code is the answer")
     args = parser.parse_args(argv)
 
     try:
         return _cmd_lint(args)
-    except SystemExit as exc:  # baseline and --set errors carry a message and a code
+    except SystemExit as exc:  # a baseline error carries a message and a code
         if isinstance(exc.code, str):
             print(exc.code, file=sys.stderr)
         return int(exc.code) if isinstance(exc.code, int) else 2

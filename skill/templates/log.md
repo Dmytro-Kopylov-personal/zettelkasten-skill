@@ -14,5 +14,6 @@ contradicted a note, a check that could not run.
 Write the log as you go, not at the end of a session. Its value is that it survives the
 context window, and a session that ends unexpectedly never gets to write the summary.
 
-Rotate older entries into `log-archive.md` when the log passes `lint_log_rotation_entries`
-entries (default 500, `ZK032`), so that the log stays readable rather than merely complete.
+Rotate older entries into `log-archive.md` when the log stops being readable at a glance —
+that is the whole test, and no check counts the entries. Nothing reports a log that has grown
+too long; the judgement is yours.

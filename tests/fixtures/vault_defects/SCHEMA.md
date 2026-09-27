@@ -1,12 +1,15 @@
 ---
 domain: note taking
+# The vocabulary this vault declares for itself. The linter checks these dimensions and
+# nothing else it thought of on its own — a vault that declares none of them is not judged
+# at all, which is what `vault_foreign/` is for. The four conformance defects this corpus
+# carries are the values that fall outside these lists.
 tags: [method, memory, cognition]
-# The corpus stays small on purpose: these three thresholds are lowered so that a
-# note of a few hundred words still exercises the checks they gate. The defaults are
-# exercised by vault_clean and by the per-check tests.
-lint_oversized_note_words: 80
-lint_multi_idea_section_words: 10
-lint_log_rotation_entries: 5
+required_fields: [id, title, type, status, created]
+types: [permanent, source, structure]
+statuses: [draft, seed, evergreen, archived]
+confidences: [low, medium, high]
+verbs: [extends, supports, contradicts, source, applies, supersedes]
 ---
 
 # Schema

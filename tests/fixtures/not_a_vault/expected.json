@@ -1,12 +1,10 @@
 {
-  "_comment": "A directory holding a README and nothing else. The three required paths are each named by ZK001, and the exit code is 2 at every threshold — never 0. Thirty checks are reported not applicable because there are no notes, no raw sources, no log and no inbox, and that emptiness is itself the finding; a report of 'no findings' from a directory the linter never understood is the failure this tool exists to prevent.",
+  "_comment": "A directory holding a README and nothing else. The three required paths are each named by ZK001, and the exit code is 2 at every threshold — never 0. Thirteen checks are reported not applicable because there are no notes, no raw sources, no log and no inbox, and that emptiness is itself the finding; a report of 'no findings' from a directory the linter never understood is the failure this tool exists to prevent.",
   "exit": {"error": 2, "warn": 2, "info": 2},
   "metrics": {"notes": 0, "raw_sources": 0, "links": 0, "orphan_rate": 0.0},
   "not_applicable": [
-    "ZK003", "ZK004", "ZK005", "ZK006", "ZK007", "ZK008", "ZK009", "ZK010",
-    "ZK011", "ZK012", "ZK013", "ZK014", "ZK015", "ZK016", "ZK017", "ZK018",
-    "ZK019", "ZK020", "ZK021", "ZK022", "ZK023", "ZK024", "ZK025", "ZK026",
-    "ZK027", "ZK028", "ZK029", "ZK030", "ZK031", "ZK032"
+    "ZK003", "ZK005", "ZK006", "ZK008", "ZK010", "ZK012", "ZK014",
+    "ZK015", "ZK019", "ZK022", "ZK026", "ZK027", "ZK028"
   ],
   "findings": [
     ["ZK001", "", "SCHEMA.md"],

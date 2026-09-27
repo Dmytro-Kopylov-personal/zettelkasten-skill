@@ -1,19 +1,18 @@
 ---
 domain: unset
+# The vocabulary this vault declares for itself. These six lists ARE the conformance rule:
+# the linter reads them out of this file and judges the notes against what it finds here,
+# and against nothing else. Nothing here is a default the linter also holds — delete a line
+# and that dimension stops being checked, in this vault, in every run from then on.
+#
+# The lists below are a starting point, not a standard. Edit them to say what this vault
+# actually does.
 tags: []
-# Thresholds the checks read. Every key is optional: the value in the comment is the
-# default the linter uses when the key is absent. Uncomment one to change it for this
-# vault only.
-# lint_oversized_note_words: 800
-# lint_multi_idea_sections: 3
-# lint_multi_idea_section_words: 40
-# lint_verb_monoculture_ratio: 0.6
-# lint_verb_monoculture_min_links: 20
-# lint_stale_draft_days: 90
-# lint_inbox_stale_days: 30
-# lint_log_rotation_entries: 500
-# lint_provenance_min_sources: 3
-# lint_provenance_min_words: 25
+required_fields: [id, title, type, status, created]
+types: [permanent, source, structure]
+statuses: [draft, seed, evergreen, archived]
+confidences: [low, medium, high]
+verbs: [extends, supports, contradicts, source, applies, supersedes]
 ---
 
 # Schema
@@ -23,14 +22,28 @@ sentence naming the subject: a vault without a domain accumulates everything and
 nothing, and the sentence is what an ingest turns to when it has to decide whether a source
 belongs.
 
-## Tags
+## The vocabulary
 
-The taxonomy the notes draw from, declared as `tags:` in the frontmatter above. A note
-carrying a tag that is not declared there is reported as `ZK016`, and while the list is
-empty the check is not applicable rather than failing every note.
+Six dimensions, each declared as a list in the frontmatter above. Each is independent, and
+each is opt-in by being present:
 
-Start with five to ten tags that name recurring subjects, not one per note. Tags that grow
-one note at a time stop being a vocabulary.
+| Dimension | What it says |
+|---|---|
+| `tags` | the subjects this vault writes about |
+| `required_fields` | the frontmatter keys every note must carry |
+| `types` | the kinds of note this vault keeps |
+| `statuses` | the stages a note moves through |
+| `confidences` | how sure a note is allowed to say it is |
+| `verbs` | the link verbs this vault uses |
+
+A dimension you have not declared is **not checked** — not defaulted, not guessed at. That
+is deliberate: a vault carried in from elsewhere is not wrong for having its own words, and
+the linter has no business inventing a taxonomy to report it against. The trade is that an
+undeclared dimension is also unguarded, so declare the ones you care about.
+
+`tags:` is empty above, and an empty list declares nothing — the check is silent rather than
+failing every note. Start with five to ten tags that name recurring subjects, not one per
+note. Tags that grow one note at a time stop being a vocabulary.
 
 ## Page Threshold
 

@@ -110,13 +110,26 @@ that shape daily work.
   on purpose — its files have fixed names and roles, so a nested `index.md` is a sub-list, not the
   index.
 
-## Adding a check means adding a way for it to fail
+## Adding a check means adding a way for it to fail — and a reason it is a fact
 
 The linter is verified against hand-labelled fixtures whose `MANIFEST.md` is written before the code
 runs, and a check that cannot run says so in `skipped_checks` rather than reporting a clean result.
 Matching a manifest is not enough on its own — it shows the right findings appeared, not that the
 right *check* produced them — so each expected finding is attributed by silencing its check in the
 registry and requiring exactly that check's findings to disappear.
+
+**A new check also has to be a fact about the vault's own files.** If it decides by a number — a word
+count, a day count, a share of the links — then it is an opinion, and it does not ship as a check.
+That rule is why v2 retired seventeen codes (V11 in `docs/design.md`); the numbers had no provenance,
+and a linter that reports its taste in the same tier as a broken reference teaches its reader to
+distrust both. An idea that is genuinely useful still has a home: write it into
+`references/note-format.md` or `references/schema-reference.md` as advice to the person writing the
+note, where a judgement call belongs and where nobody reads it as a measurement.
+
+The three things every new check owes, then: a fixture where it fires and a manifest that predicted
+it, a reason it is a fact rather than a preference, and an entry in `references/lint-checks.md` with
+its severity — `test_docs.py` asserts the reference and the registry against each other in both
+directions, so a code cannot ship undocumented or at a tier its own entry does not state.
 
 Every instrument here carries a control in the opposite direction, so a check that flags everything
 and one that flags nothing cannot both pass. `docs/design.md` says why, at length, and

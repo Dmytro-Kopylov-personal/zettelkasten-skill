@@ -21,11 +21,13 @@ completely misleading. So:
 - the human summary says out loud what the code means, on stderr, so it cannot be confused
   with a finding.
 
-## Thirty checks are not applicable
+## Thirteen checks are not applicable
 
-With no notes, no raw sources, no log and no inbox, thirty checks are reported as not
-applicable — twenty-two of them because "the vault has no permanent notes". That is the
-same emptiness as the `ZK001`s, reported once per check.
+With no notes, no raw sources, no log and no inbox, thirteen checks are reported as not
+applicable — eight of them because "the vault has no permanent notes", one because there is
+no `structure/index.md`, one because there is no `log.md`, one because there is no `SCHEMA.md`
+declaring a vocabulary, and two because there are no raw sources. That is the same emptiness
+as the `ZK001`s, reported once per check.
 
 It is worth being explicit that this is *true and not enough*: the not-applicable list is
 long, and a reader skimming a report could take its length as a sign that something ran. The

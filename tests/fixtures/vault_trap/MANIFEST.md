@@ -2,7 +2,7 @@
 
 Written by hand before the linter was run against it.
 
-**Expected: 1 finding (ZK011 on `202609280904-isolated-claim`), exit 0, 4 notes.**
+**Expected: 1 finding (ZK010 on `202609280904-isolated-claim`), exit 0, 4 notes.**
 
 ## The traps
 
@@ -27,11 +27,14 @@ finding. False positives here are loud, not silent.
 
 `permanent/202609280904-isolated-claim.md` links *out* to two notes, and **nothing links to
 it** — while `structure/index.md` lists it. That is deliberate and it is the whole point of
-`ZK011`: structure links are excluded from the inbound count, so a vault whose index lists
-every note still has orphans, and the check is not vacuously satisfied by the index that
-every vault is required to have.
+the `ZK010` merge: structure links are excluded from the inbound count, so a vault whose
+index lists every note still has isolated notes, and the check is not vacuously satisfied by
+the index that every vault is required to have. Merging the old floor-of-two check into it
+did not soften that, because the floor was the part that decided by a number and the
+one-sided reachability is the part that is a fact about the graph.
 
-The first three notes form a cycle, so the only orphan is the one that was meant to be one.
+The first three notes form a cycle, so the only isolated note is the one that was meant to
+be one.
 `metrics.orphan_rate` is 0.25 — one in four — and that number is pinned in `expected.json`
 so that a change to how orphans are counted cannot pass unnoticed.
 
@@ -42,10 +45,10 @@ so that a change to how orphans are counted cannot pass unnoticed.
 | `permanent/202609280901-attention-budget.md` | Carries the fence, inline-code and markdown-link traps; quoted-colon title | None |
 | `permanent/202609280902-forgetting-curve.md` | Quoted-hash title; tilde fence | None |
 | `permanent/202609280903-spacing-effect.md` | An ordinary note, so the cycle closes | None |
-| `permanent/202609280904-isolated-claim.md` | Links out, receives nothing, listed in the index | `ZK011` · its own slug |
-| `structure/index.md` | Lists all four, including the orphan | None |
-| `SCHEMA.md` | No `tags:` key, so `ZK016` is not applicable | None |
-| `log.md` | One dated entry, well under the rotation threshold | None |
+| `permanent/202609280904-isolated-claim.md` | Links out, receives nothing, listed in the index | `ZK010` · its own slug |
+| `structure/index.md` | Lists all four, including the isolated note | None |
+| `SCHEMA.md` | Declares no vocabulary, so `ZK003` is not applicable | None |
+| `log.md` | One dated entry | None |
 | `raw/articles/attention.md` | Cited by all four notes; digest correct | None |
 
 ## What this fixture does not test

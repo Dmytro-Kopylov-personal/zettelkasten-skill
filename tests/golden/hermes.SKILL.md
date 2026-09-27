@@ -1,7 +1,7 @@
 ---
 name: zettelkasten
 description: 'Ingest, query, lint and init a Zettelkasten vault. Use when the user drops a source, asks a question of their notes, or says lint, audit or health-check.'
-version: 1.0.3
+version: 2.0.0
 author: Dmytro Kopylov
 license: MIT
 platforms: [linux, macos, windows]
@@ -98,15 +98,16 @@ and skipping it is the most common way to corrupt a vault.
 | Principle | Rule |
 |---|---|
 | Atomicity | One idea per note. If the title needs "and", it is two notes. |
-| Dense linking | At least two outbound links per note, and ideally at least one inbound. Orphans are lint failures. |
+| Dense linking | At least two outbound links per note, and ideally at least one inbound. A note with either direction missing is reported. |
 | Stable identity | `YYYYMMDDHHMM-slug.md`, with `id:` matching the filename. Titles may change; IDs do not. |
 | Provenance | Every factual claim traces to a source: `^[raw/articles/x.md]` inline, and the raw path in `sources:`. |
 | Semantic links | Each link carries a verb: `extends`, `supports`, `contradicts`, `source`, `applies`, `supersedes`. |
 | Human triage | You propose; the user approves. Nothing is written to `permanent/` before confirmation unless the user explicitly asked for automated mode. |
 
 The long forms — the Page Threshold, the atomicity test, verb semantics, the contradiction policy —
-are in `references/schema-reference.md`. **The vault's own `SCHEMA.md` overrides the defaults**, so
-read it first and follow it where the two differ.
+are in `references/schema-reference.md`. **The vault's own `SCHEMA.md` declares the vocabulary**, so
+read it first: the values above are what `init` scaffolds, and a vault that has changed them means
+it.
 
 ## Note format
 
@@ -214,13 +215,17 @@ manual procedure when the linter cannot run.
 
 Then interpret, in this order:
 
-1. **Structural errors first** — broken links, bad verbs, missing fields, ID/filename disagreement.
-   These are not stylistic; a broken link means the graph is lying about itself.
-2. **Orphans and thin notes** — zero inbound links, fewer than two outbound. Propose specific links
+1. **Structural errors first** — broken references, broken identity, frontmatter that will not
+   parse, bad dates. These are not stylistic; a reference that resolves to nothing means the graph
+   is lying about itself.
+2. **Vocabulary** — a note that does not match what its own `SCHEMA.md` declares. Use a declared
+   value, or propose the addition to the schema deliberately; do not quietly widen it.
+3. **Isolation** — nothing links to the note, or the note links to nothing. Propose specific links
    with verbs, not "consider linking this".
-3. **Decay** — stale drafts, sources whose content has drifted from its recorded digest.
-4. **Advisory** — split candidates, unreciprocated contradictions, provenance gaps. Advisory items
-   are information, not a to-do list.
+4. **Decay** — a source whose content has drifted from its recorded digest, a note with no body, a
+   log entry with no date.
+5. **Advisory** — unreciprocated contradictions, an uncited source, a body that disagrees with its
+   frontmatter. Advisory items are information, not a to-do list.
 
 Group findings by fix, propose the batch, and report the delta after applying it. If the vault has
 no baseline yet and the findings are numerous, say so plainly rather than presenting a hundred

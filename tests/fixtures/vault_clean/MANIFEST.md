@@ -19,9 +19,9 @@ inbound link, both raw files are cited, the index lists every note, and the one
 
 | File | Purpose | Expected findings |
 |---|---|---|
-| `SCHEMA.md` | Domain and the four-tag taxonomy (`cognition`, `memory`, `method`, `knowledge-management`) every note's tags come from | None |
-| `log.md` | Three dated entries; well under the 500-entry rotation threshold | None |
-| `inbox/` (empty) | Present, so ZK031 is *not applicable* rather than *failing* | None |
+| `SCHEMA.md` | Declares all six vocabulary dimensions — the four-tag taxonomy, the nine required fields, one type, two statuses, two confidences, six verbs — and every note conforms to all six, so ZK003 is exercised rather than skipped | None |
+| `log.md` | Three dated entries; no check counts them any more | None |
+| `inbox/` (empty) | Present because the scaffold creates it. No check reads it now: the check that did was the unfiled-capture nudge, retired with the thresholds | None |
 | `structure/index.md` | Lists all 8 notes — an incomplete index is ZK012 | None |
 | `structure/concept-table.md` | Links only to `structure/`, which never counts toward the inbound-link total | None |
 | `structure/overview.md` | Prose, no links | None |
@@ -32,9 +32,9 @@ inbound link, both raw files are cited, the index lists every note, and the one
 | `permanent/202609200902-working-memory.md` | The other side of the reciprocal `contradicts` pair; 3 links | None |
 | `permanent/202609200903-retrieval-beats-review.md` | Two tags, both from the taxonomy | None |
 | `permanent/202609200904-compile-beats-retrieve.md` | Cited `raw/articles/karpathy-llm-wiki-2026.md` | None |
-| `permanent/202609200905-link-density.md` | Status `seed`, `updated` recent enough to be unstale | None |
+| `permanent/202609200905-link-density.md` | Status `seed`, one of the two the declaration lists | None |
 | `permanent/202609200906-provenance-marker.md` | Body carries a `^[raw/...]` marker | None |
-| `permanent/202609200907-atomic-note.md` | Title has no "and" (ZK025) and the body is one paragraph short of multi-idea | None |
+| `permanent/202609200907-atomic-note.md` | Title has no "and" in it, and a body of one idea | None |
 
 ## Why these links
 
@@ -46,13 +46,16 @@ design. The rotation uses `supports`, `extends`, `applies`, `source` and `supers
 (`attention-budget` ↔ `working-memory`), because a one-sided `contradicts` is ZK027 and
 scattering the verb through a rotation is exactly how that finding gets made by accident.
 
-## Checks that are not applicable here, and why that is reported
+## Nothing is not applicable here, and that is the point
 
-`ZK024` (no note cites 3 or more sources — every note cites one, two notes cite two),
-`ZK029` (17 links; the monoculture check needs 20 before a ratio is meaningful), and
-`ZK031` (the inbox is empty). These are printed as `NOT RUN` with their reasons. A check
-that could not run must say so: silence and success are indistinguishable in a count.
+Every one of the fifteen checks has a surface to read in this vault, and all fifteen read it
+clean. That is a stronger claim than it used to be. Under v1 this fixture reported three
+checks as `NOT RUN` — no note cited three sources, the graph was below the monoculture floor,
+and the inbox was empty. All three were threshold checks, and all three are gone.
 
-vault_clean deliberately stays under the ZK029 floor. The verb-monoculture measurement
-needs a bigger graph, and inventing 20 links here would make this fixture about the
-monoculture check instead of about being clean.
+The one that would have gone quiet for a bad reason is `ZK003`. Conformance is the check a
+vault can switch off by declaring nothing, so a "clean" report from a vault that declares
+nothing means *unjudged*, not *conforming* — which is exactly what `vault_minimal/` and
+`vault_foreign/` show. This fixture declares all six dimensions and conforms to all six, so
+its clean report is about conformance rather than about silence. A check that could not run
+must say so: silence and success are indistinguishable in a count.

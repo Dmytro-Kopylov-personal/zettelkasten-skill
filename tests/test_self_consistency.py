@@ -95,7 +95,7 @@ def vault(tmp_path):
 
 
 def lint(root):
-    return zettel_lint.lint_vault(root, {}, NOW, set(), zettel_lint.ERROR)
+    return zettel_lint.lint_vault(root, NOW, set(), zettel_lint.ERROR)
 
 
 # --- the three sides of the loop -------------------------------------------------------
@@ -136,9 +136,12 @@ def test_the_fresh_vault_is_clean_because_checks_ran_not_because_they_could_not(
     document, _ = lint(vault)
     skipped = {entry["code"] for entry in document["skipped_checks"]}
     # These had input and passed on it.
-    assert not {"ZK001", "ZK012", "ZK022", "ZK032"} & skipped
-    # These had none, and say so rather than reporting a pass.
-    assert {"ZK010", "ZK011", "ZK023"} <= skipped
+    assert not {"ZK001", "ZK012", "ZK022"} & skipped
+    # These had none, and say so rather than reporting a pass — every check whose subject is
+    # a note, because the vault has none yet, and every check whose subject is a capture,
+    # because a new vault has no `raw/` either. That every code is in one table or the other
+    # is asserted in `test_lint_checks.py`; here it is the two sets, exactly.
+    assert skipped == zettel_lint.NOTE_SCOPED | zettel_lint.RAW_SCOPED
     assert document["summary"]["metrics"]["notes"] == 0
 
 
@@ -213,7 +216,7 @@ def test_a_note_written_into_the_fresh_vault_is_the_first_thing_that_goes_wrong(
     )
     document, code = lint(vault)
     assert code == 1
-    assert {finding["code"] for finding in document["findings"]} >= {"ZK010", "ZK011", "ZK012"}
+    assert {finding["code"] for finding in document["findings"]} >= {"ZK010", "ZK012"}
 
 
 def test_the_scaffold_survives_its_own_round_trip_through_the_reader(vault):

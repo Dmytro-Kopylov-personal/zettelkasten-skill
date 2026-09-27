@@ -1,0 +1,9 @@
+{
+  "_comment": "Hand-written before the linter ran. One finding, and it is the extension-less target that is genuinely absent — the same finding v1 produced, so the widening of the resolver is shown to change only the case it was meant to change. The MANIFEST records the v1 run over this same fixture: 4 findings, three of them on the extension-less target that DOES exist.",
+  "exit": {"error": 1, "warn": 1, "info": 1},
+  "metrics": {"notes": 3, "raw_sources": 1, "links": 6, "orphan_rate": 0.0},
+  "not_applicable": ["ZK003", "ZK027"],
+  "findings": [
+    ["ZK008", "permanent/202610010901-missing-without-extension.md", "raw/articles/absent"]
+  ]
+}
