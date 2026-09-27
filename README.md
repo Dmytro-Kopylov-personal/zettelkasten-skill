@@ -27,13 +27,26 @@ flowchart LR
   NOTHING["nothing yet"] --> INT["INIT<br/>scaffold a vault,<br/>ask what it is about"]
   SRC["a source —<br/>a URL, a file, a paste"] --> ING["INGEST<br/>capture, discuss,<br/>propose, then write"]
   Q["a question about<br/>what you have read"] --> QRY["QUERY<br/>answer with note IDs,<br/>file only new synthesis"]
-  MESS["a vault that feels<br/>messy or stale"] --> LNT["LINT<br/>report by severity,<br/>never edit anything"]
+  MESS["a vault that feels<br/>messy or stale"] --> LNT["LINT<br/>report by severity,<br/>never fix without you"]
 
   INT --> V[("your vault")]
   ING --> V
   QRY --> V
   LNT --> V
+
+  classDef writes fill:#e6f4ea,stroke:#2e7d32,stroke-width:2px,color:#14532d
+  classDef reads fill:#e8eef7,stroke:#1565c0,stroke-width:2px,color:#0d3c61
+  classDef nowrite fill:#eceff1,stroke:#607d8b,stroke-width:2px,color:#37474f
+  class INT,ING writes
+  class QRY reads
+  class LNT nowrite
 ```
+
+The colours say what each operation does to the vault, not how important it is: green writes —
+`init` creates it, `ingest` proposes and then writes — blue reads and files only genuine new
+synthesis, and grey changes nothing on its own. `lint` reports, and its fixes are proposals that
+wait for your approval like any other write — which is the property the rest of this page leans on.
+The labels say the same thing the colours do, so the diagram still reads in greyscale.
 
 You do not have to name the operation. Saying *"ingest this"*, *"what do my notes say about
 spacing"*, *"lint the vault"* or *"start me a Zettelkasten"* is enough; the skill recognises all
