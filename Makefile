@@ -17,13 +17,13 @@ $(SKILL_MD): src/SKILL.template.md src/fragments/frontmatter.claude.yaml src/fra
 eval-lint: $(SKILL_MD) ## validate every eval case and run none — no model, no cost
 	claude plugin eval skill --trust-plugin --case __lint__
 
-#: Reproduces the ablation `docs/results.md` records, flag for flag — that page says this target is
-#: the same command, and it now is. Each flag earns its place: `Read Glob Grep Skill` are the tools
-#: the with-arm needs to read a vault and load the skill at all; `--max-cost-usd` is a ceiling, not
-#: decoration, since the recorded run cost $7.54 and nothing else here bounds the bill;
-#: `--keep-temp` keeps the `trace.jsonl` files the model attribution in results.md was read from,
-#: so without it a run cannot be checked for which model actually executed.
-#: RUNS defaults to 1 to match the recorded run. RUNS=3 buys the variance figure results.md notes
+#: Reproduces the ablation `docs/verification.md` records, flag for flag — that page says this
+#: target is the same command, and it now is. Each flag earns its place: `Read Glob Grep Skill` are
+#: the tools the with-arm needs to read a vault and load the skill at all; `--max-cost-usd` is a
+#: ceiling, not decoration, since the recorded run cost $7.54 and nothing else here bounds the bill;
+#: `--keep-temp` keeps the `trace.jsonl` files the model attribution in verification.md was read
+#: from, so without it a run cannot be checked for which model actually executed.
+#: RUNS defaults to 1 to match the recorded run. RUNS=3 buys the variance figure verification.md notes
 #: is missing — the per-case default is 3, so this variable is the only thing choosing otherwise.
 RUNS ?= 1
 

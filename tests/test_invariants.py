@@ -14,6 +14,7 @@ must also survive, which is what the negative control pins down.
 from __future__ import annotations
 
 import re
+import subprocess
 
 import pytest
 from conftest import FIXTURES, REPO
@@ -249,3 +250,52 @@ def test_no_fixture_is_named_skill_md():
         pytest.skip("no fixtures yet")
     offenders = [p for p in FIXTURES.rglob("SKILL.md")]
     assert not offenders, f"fixtures must not contain SKILL.md: {offenders}"
+
+
+#: A path that exists on exactly one machine. The installer's suite asserts this for the fragment
+#: it writes; here it is the whole tracked tree, because a run artifact carrying the author's home
+#: directory sat one `.gitignore` line away from being published.
+PERSONAL_PATH = re.compile(r"/(?:Users|home)/[A-Za-z]")
+
+
+def test_the_personal_path_predicate_has_both_controls():
+    # Assembled from parts, because the sweep below reads this file too: a literal sample would
+    # be a genuine hit rather than a control.
+    users = "/Us" + "ers/someone/dev/notes"
+    home = "/ho" + "me/someone/vault"
+    assert PERSONAL_PATH.search(f"root = {users}")
+    assert PERSONAL_PATH.search(f"copied out of {home}")
+    # The string quoted as a prohibition is not a path, and neither is ordinary prose.
+    assert not PERSONAL_PATH.search("no `/Users/`-style absolute path ships")
+    assert not PERSONAL_PATH.search("docs/verification.md")
+
+
+def test_no_tracked_file_names_a_path_on_one_machine():
+    listed = subprocess.run(
+        ["git", "ls-files"], cwd=REPO, capture_output=True, text=True, check=True
+    ).stdout.splitlines()
+    assert listed, "git ls-files returned nothing, so this proves nothing"
+    hits = []
+    for name in listed:
+        try:
+            text = (REPO / name).read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        hits += [f"{name}: {match.group(0)}" for match in PERSONAL_PATH.finditer(text)]
+    assert not hits, "a path from one machine is tracked:\n" + "\n".join(hits)
+
+
+def test_the_eval_run_artifacts_are_still_ignored():
+    """A run's traces carry the directory it ran in. The cases are tracked; the output is not,
+    and that is one `.gitignore` line — so it is asserted rather than trusted."""
+
+    def ignored(path: str) -> bool:
+        return (
+            subprocess.run(
+                ["git", "check-ignore", "-q", path], cwd=REPO, capture_output=True
+            ).returncode
+            == 0
+        )
+
+    assert ignored("skill/evals/results/ablation.json")
+    assert not ignored("skill/evals/ingest-follows-the-protocol/case.yaml")

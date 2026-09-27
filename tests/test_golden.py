@@ -288,9 +288,9 @@ def test_the_version_is_declared_once_and_repeated_only_where_it_must_be():
     """Three hand-maintained strings, one release.
 
     The plugin manifest and the two platform frontmatter fragments each carry the skill's
-    version, and nothing else ties them together — so a bump that updates two of them ships
-    a Hermes frontmatter disagreeing with the plugin it came from, silently, because no
-    consumer reads both.
+    version, and this test is what holds them level — without it a bump that updated two of
+    them would ship a Hermes frontmatter disagreeing with the plugin it came from, silently,
+    because no consumer reads both.
 
     Read with a line pattern rather than a parser: Claude's frontmatter nests the key under
     `metadata`, and the linter's parser rejects nested mappings by design because it reads

@@ -55,8 +55,9 @@ above it in the `Makefile` before changing a flag: the recorded run cost $7.54, 
 
 ## Version declarations
 
-Six files carry the version and **nothing cross-checks them**, so a bump means editing two and
-regenerating the rest:
+Six files carry the version — three written by hand, three regenerated — and `test_golden.py`
+reads all three hand-written copies and fails if they disagree, so a missed edit is caught
+rather than shipped:
 
 | Edit by hand | Regenerated from the fragment |
 |---|---|
@@ -119,7 +120,7 @@ registry and requiring exactly that check's findings to disappear.
 
 Every instrument here carries a control in the opposite direction, so a check that flags everything
 and one that flags nothing cannot both pass. `docs/design.md` says why, at length, and
-`docs/results.md` records what each control caught. **That is the standard this repo holds itself to,
+`docs/verification.md` records what each control caught. **That is the standard this repo holds itself to,
 and it is the most useful thing to read before changing `zettel_lint.py`.**
 
 Two rules that are not negotiable in the linter:

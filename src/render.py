@@ -46,8 +46,8 @@ CLAUDE_ALLOWED_KEYS = frozenset(
 MAX_DESCRIPTION_CHARS = 1024
 
 # Copilot's docs state no body limit; this cap is third-party `awesome-copilot`
-# guidance. Kept because exceeding it is a real load failure in the wild, and because
-# the shared body is designed to sit far below it.
+# guidance, kept as a budget with wide margin rather than a platform rule. The
+# shared body sits far below it, and no load failure from exceeding it is on record.
 COPILOT_MAX_BODY_LINES = 500
 
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
@@ -62,7 +62,6 @@ class PlatformSpec:
     name: str
     frontmatter: str
     environment: str
-    description_must_start_within: int | None = None
 
     @property
     def frontmatter_path(self) -> Path:
@@ -193,8 +192,9 @@ def validate(platform: str, text: str) -> list[str]:
                 f"keys outside Anthropic's allowlist (quick_validate fails on these): {sorted(extra)}"
             )
 
-    # Copilot's docs say to keep angle brackets out of the description; Anthropic's
-    # quick_validate.py rejects them outright. Hermes does not care either way.
+    # Anthropic's quick_validate.py rejects angle brackets in a description, and a test
+    # asserts it. No Copilot document states a rule either way; the same restriction covers
+    # both so one description serves every platform. Hermes does not care.
     if platform in ("claude", "copilot") and description and any(c in description for c in "<>"):
         problems.append("description must not contain '<' or '>'")
 

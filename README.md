@@ -107,8 +107,8 @@ and nothing else. It never overwrites a file the installer did not write; the re
 you to move the file, not to re-run with a flag. A file it *did* write is backed up to
 `.bak.<timestamp>` before being replaced, and re-running is a no-op.
 
-Leave `--platform` off and it detects what you have. Exit codes: 0 ok · 1 render failure ·
-2 usage · 3 platform not detected · 4 unmanaged file.
+Leave `--platform` off and it detects what you have. Exit codes: 0 ok · 1 render failure or a
+missing `python3`/sha256 tool · 2 usage · 3 platform not detected · 4 unmanaged file.
 
 Copilot has two locations, and they are different scopes:
 
@@ -516,14 +516,15 @@ install section above suggests checking before installing a second copy.
 **The ablation is weaker than it looks.** Both eval cases score 1.00 with the skill and below
 threshold without, but each delta rests on a single grader that tests a *naming convention*, so it
 demonstrates less than "the skill works" — an agent with no skill loaded still indexed, logged,
-linked and contained itself. Every run in it executed as `deepseek-flash`, not Claude. The run trees
-showing this are kept, and `docs/results.md` records the measurement.
+linked and contained itself. The runs were not Claude runs: they executed on a non-Claude backend,
+read from each run's own trace at the time, and the traces are not shipped — so no row of that
+measurement may be quoted as a Claude result. `docs/verification.md` records it.
 
 **The agent can ignore the protocol.** A loaded skill is not a followed skill. Lint makes drift
 detectable after the fact — that is the mitigation, not a guarantee.
 
-`docs/results.md` carries the measurements and every unverified marker; `docs/plan.md` the phase
-gates.
+`docs/verification.md` carries the measurements and every unverified marker; `docs/design.md` the
+findings that changed the design, each with what established it.
 
 ---
 
@@ -537,7 +538,7 @@ gates.
 | `skill/references/tool-free-fallback.md` | what to do with no shell |
 | `docs/architecture.md` | how it is shaped, and where the three platforms pull apart — diagrams |
 | `docs/design.md` | why it is built this way, including what went wrong on the way |
-| `docs/results.md` | what has actually been measured, and what has not |
+| `docs/verification.md` | what has actually been measured, and what has not |
 | `CONTRIBUTING.md` | the repo layout, the build, and the standard a change has to meet |
 
 ### When the agent has no shell
@@ -553,7 +554,8 @@ silence is never mistaken for a pass.
 Every claim in this repo is backed by something checkable, and this README names what was *not*
 verified — Copilot's VS Code extension, the Copilot cloud agent — rather than leaving you to find
 out. The measurements carry the same markers, including where the skill's own evaluation turned out
-to be weaker than it looked (`docs/design.md`, finding V8; the run trees are in `docs/results.md`).
+to be weaker than it looked (`docs/design.md`, finding V8; the measurement is in
+`docs/verification.md`).
 
 ---
 

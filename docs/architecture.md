@@ -79,8 +79,9 @@ Three divergences are worth naming, because each is a silent failure rather than
 
 **The same version, written three ways.** Hermes takes `version:` at the top level. Claude's
 allowlist has no `version` key at all, so it moves under `metadata:`. Copilot declares none.
-Nothing validates that these agree — the tag, `plugin.json` and the Hermes fragment are three
-separate declarations of one number.
+Nothing in the formats ties them together, so a test does: `test_golden.py` reads the version
+out of the plugin manifest and both fragments and fails if any two disagree. Without it a bump
+that missed one would ship silently, because no consumer reads more than one of them.
 
 **Hermes truncates the description to 57 characters.** That truncated string is the entire
 discovery surface: a skill whose trigger verbs fall past it is present but unfindable. The
@@ -88,8 +89,9 @@ render is asserted to keep `ingest`, `query`, `lint`, `init` and `zettelkasten` 
 53.
 
 **Copilot resolves the skill by directory name**, so `name:` must equal `zettelkasten`, and the
-body is capped at 500 lines on third-party guidance. VS Code documents no limit; the cap is kept
-because exceeding it is a real load failure in the wild.
+body is capped at 500 lines on third-party `awesome-copilot` guidance. VS Code documents no
+limit, and no load failure from exceeding the cap is on record — it is kept as a budget with wide
+margin, and the renderer enforces it rather than trusting it.
 
 ## What ships, and what only looks like it ships
 

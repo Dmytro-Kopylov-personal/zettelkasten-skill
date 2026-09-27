@@ -60,6 +60,23 @@ def test_claude_validator_rejects_what_it_should(tmp_path):
     assert problems and "Unexpected key" in problems[0]
 
 
+def test_claude_validator_rejects_angle_brackets(tmp_path):
+    """The rule `render.validate()` applies to Claude, asserted against the validator that is
+    the reason it exists — `description must not contain '<' or '>'` otherwise rests on a
+    comment. Copilot documents no such rule; the local check covers both because one
+    description has to serve every platform."""
+    skill_dir = tmp_path / "zettelkasten"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: zettelkasten\ndescription: 'uses <brackets>'\nlicense: MIT\n---\n\nbody\n",
+        encoding="utf-8",
+    )
+    problems, reason = real_validators.check_claude(skill_dir)
+    if reason:
+        pytest.skip(reason)
+    assert problems and "angle brackets" in problems[0]
+
+
 def test_the_hermes_render_survives_hermes_own_parser():
     """V6: `platforms` must come out of the *real* parser as a list, or Hermes hides us.
 
