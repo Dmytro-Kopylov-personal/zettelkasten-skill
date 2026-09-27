@@ -149,7 +149,19 @@ flowchart TD
   PERM -->|summarised by| STRUCT
   PERM -->|"every change<br/>is a line in"| LOG
   LOG -.->|"past 500 entries"| ARCH["log-archive.md"]
+
+  classDef required fill:#e6f4ea,stroke:#2e7d32,stroke-width:2px,color:#14532d
+  classDef support fill:#e8eef7,stroke:#1565c0,stroke-width:1px,color:#0d3c61
+  classDef later fill:#eceff1,stroke:#607d8b,stroke-width:1px,stroke-dasharray:5 5,color:#37474f
+  class SCHEMA,PERM,LOG required
+  class RAW,INBOX,STRUCT support
+  class ARCH later
 ```
+
+Green marks the three that make a folder a vault, blue the ones `init` creates alongside them, and
+grey the one that only appears once the log has rotated. The colours restate the labels rather than
+carrying the distinction alone, which is deliberate: a diagram whose meaning survives being printed
+in black and white is the only kind worth colouring.
 
 Three of those paths carry more weight than their contents: **`permanent/`, `SCHEMA.md` and `log.md`
 are what make a folder a vault.** Resolution walks upward looking for all three together, and

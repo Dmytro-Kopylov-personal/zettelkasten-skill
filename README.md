@@ -376,7 +376,16 @@ flowchart LR
   E -->|retire| AR
 
   N["a new note"] -->|"links supersedes"| AR
+
+  classDef working fill:#e6f4ea,stroke:#2e7d32,stroke-width:2px,color:#14532d
+  classDef retired fill:#eceff1,stroke:#607d8b,stroke-width:2px,stroke-dasharray:5 5,color:#37474f
+  class D,S,E working
+  class AR retired
 ```
+
+Green is a working state and grey is the one you leave on purpose; the successor note stays
+uncoloured because it is an actor here, not a state. The colours only echo what each box already
+says, so the diagram still reads in greyscale.
 
 Every note is in one of those four states, and `status` is a required field, so there is no fifth.
 The first three are working states. The moves between them are promotions, and nothing promotes a
