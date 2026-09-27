@@ -128,6 +128,41 @@ installs as zero skills. It is the Claude render, and `test_golden.py` asserts i
 to `tests/golden/claude.SKILL.md` — so the copy is for the loader, and the golden is still the
 single source of truth. The guarantee moved from absence to a test.
 
+## What a vault is
+
+The artifact, before the loop that maintains it. `init` creates all of this in one folder, and
+nothing else belongs in that folder: the vault root is the boundary of every write.
+
+```mermaid
+flowchart TD
+  subgraph VAULT["a vault — one folder, nothing else"]
+    SCHEMA["SCHEMA.md<br/>the vault's own rules:<br/>domain · tags · verbs · thresholds"]
+    PERM["permanent/<br/>one atomic idea per note<br/>id-slug.md"]
+    RAW["raw/articles · raw/papers · raw/notes<br/>captures — immutable, sha256 recorded"]
+    INBOX["inbox/<br/>material not yet processed"]
+    STRUCT["structure/<br/>index · concept-table · overview"]
+    LOG["log.md<br/>one line per operation"]
+  end
+
+  RAW -->|ingest| PERM
+  INBOX -->|"ingest, or delete<br/>and say why"| RAW
+  PERM -->|summarised by| STRUCT
+  PERM -->|"every change<br/>is a line in"| LOG
+  LOG -.->|"past 500 entries"| ARCH["log-archive.md"]
+```
+
+Three of those paths carry more weight than their contents: **`permanent/`, `SCHEMA.md` and `log.md`
+are what make a folder a vault.** Resolution walks upward looking for all three together, and
+`ZK001` names exactly these three when one is missing — a folder without them is reported as *not a
+vault* and exits 2, rather than being linted as an empty vault and reported clean. That distinction
+is the one the `not_a_vault` fixture exists to hold.
+
+`log-archive.md` is the only path not there at the start. It appears when the log passes
+`lint_log_rotation_entries`, because a log that only grows stops being readable and an unread log is
+not a history. `SCHEMA.md` is the other file worth opening first: the linter carries a default for
+every threshold, and a vault's own `SCHEMA.md` overrides them for that vault alone, which is how one
+linter judges two vaults held to different standards.
+
 ## How it holds together at run time
 
 The load-bearing separation: **the script verifies, the agent writes.** Nothing in `scripts/`

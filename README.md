@@ -366,6 +366,24 @@ and `lint`, and what this skill offers instead of removal is **retirement**, whi
 That is the vault's premise rather than a missing feature: a vault that deletes what it no longer
 believes cannot show that it changed its mind.
 
+```mermaid
+flowchart LR
+  D["draft<br/>written, not trusted"] -->|"settled enough<br/>to link to"| S["seed<br/>thin, but linkable"]
+  S -->|"you would defend<br/>it as written"| E["evergreen"]
+
+  D -->|retire| AR["archived<br/>kept · linkable · unmaintained"]
+  S -->|retire| AR
+  E -->|retire| AR
+
+  N["a new note"] -->|"links supersedes"| AR
+```
+
+Every note is in one of those four states, and `status` is a required field, so there is no fifth.
+The first three are working states. The moves between them are promotions, and nothing promotes a
+note for you: `ZK017` is the only nudge in the system, a warning that a `draft` or `seed` has gone
+untouched for `lint_stale_draft_days` — 90 by default — and its wording is the choice it is offering
+you, *promote it, split it, or archive it*. `archived` is the one state you leave on purpose.
+
 **Archiving is the ordinary retirement.** Set a note's `status:` to `archived` and it stays where it
 is, stays linkable, and stops asking to be maintained — the staleness prompt (`ZK017`) watches only
 `draft` and `seed`. Nothing else moves. In a vault of thirty notes, archiving the most heavily linked
